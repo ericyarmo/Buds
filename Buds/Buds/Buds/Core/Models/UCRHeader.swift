@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import GRDB
 
 /// Universal Content Receipt Header
 /// Represents a signed, content-addressed event
@@ -23,7 +24,7 @@ struct UCRHeader: Codable {
 }
 
 /// GRDB row representation (includes local fields)
-struct UCRHeaderRow: Codable {
+struct UCRHeaderRow: Codable, FetchableRecord {
     let cid: String
     let did: String
     let deviceId: String

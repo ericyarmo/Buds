@@ -54,6 +54,11 @@ final class Database {
             try createTablesV1(db)
         }
 
+        // Migration v2: Support multiple images per memory
+        migrator.registerMigration("v2") { db in
+            try migrateToMultipleImages(db)
+        }
+
         return migrator
     }
 
@@ -65,6 +70,29 @@ final class Database {
 
     func write<T>(_ block: (GRDB.Database) throws -> T) throws -> T {
         try dbQueue.write(block)
+    }
+
+    // Async versions for use with async/await
+    func readAsync<T>(_ block: @escaping (GRDB.Database) throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            do {
+                let result = try dbQueue.read(block)
+                continuation.resume(returning: result)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    func writeAsync<T>(_ block: @escaping (GRDB.Database) throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            do {
+                let result = try dbQueue.write(block)
+                continuation.resume(returning: result)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
     }
 }
 
@@ -177,4 +205,55 @@ private func createTablesV1(_ db: GRDB.Database) throws {
     """)
 
     print("✅ Database schema v1 created")
+}
+
+// MARK: - Migration v2
+
+private func migrateToMultipleImages(_ db: GRDB.Database) throws {
+    // 1. Create new column for multiple image CIDs
+    try db.execute(sql: """
+        ALTER TABLE local_receipts
+        ADD COLUMN image_cids TEXT
+    """)
+
+    // 2. Migrate existing single image_cid to image_cids array
+    try db.execute(sql: """
+        UPDATE local_receipts
+        SET image_cids = CASE
+            WHEN image_cid IS NOT NULL AND image_cid != ''
+            THEN json_array(image_cid)
+            ELSE json_array()
+        END
+    """)
+
+    // 3. Drop old image_cid column (SQLite limitation: recreate table)
+    try db.execute(sql: """
+        CREATE TABLE local_receipts_new (
+            uuid TEXT PRIMARY KEY NOT NULL,
+            header_cid TEXT NOT NULL UNIQUE,
+            is_favorited INTEGER NOT NULL DEFAULT 0,
+            tags_json TEXT,
+            local_notes TEXT,
+            image_cids TEXT,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL,
+            FOREIGN KEY (header_cid) REFERENCES ucr_headers(cid) ON DELETE CASCADE
+        )
+    """)
+
+    try db.execute(sql: """
+        INSERT INTO local_receipts_new
+        SELECT uuid, header_cid, is_favorited, tags_json, local_notes, image_cids, created_at, updated_at
+        FROM local_receipts
+    """)
+
+    try db.execute(sql: "DROP TABLE local_receipts")
+    try db.execute(sql: "ALTER TABLE local_receipts_new RENAME TO local_receipts")
+
+    // 4. Recreate index
+    try db.execute(sql: """
+        CREATE INDEX idx_local_receipts_favorited ON local_receipts(is_favorited)
+    """)
+
+    print("✅ Database migrated to v2 (multiple images support)")
 }

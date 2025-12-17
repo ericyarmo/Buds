@@ -13,110 +13,128 @@ struct MemoryCard: View {
     let onToggleFavorite: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BudsSpacing.s) {
-            // Header: Strain + Favorite
-            HStack {
-                Text("\(memory.productType.emoji) \(memory.strainName)")
-                    .font(.budsHeadline)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header section with colored accent
+            VStack(alignment: .leading, spacing: BudsSpacing.xs) {
+                HStack(alignment: .top) {
+                    HStack(spacing: 8) {
+                        Text(memory.productType.emoji)
+                            .font(.title2)
+                        Text(memory.strainName)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.budsTextPrimary)
+                    }
 
-                Spacer()
+                    Spacer()
 
-                Button(action: onToggleFavorite) {
-                    Image(systemName: memory.isFavorited ? "heart.fill" : "heart")
-                        .foregroundColor(memory.isFavorited ? .budsError : .secondary)
-                        .font(.body)
+                    Button(action: onToggleFavorite) {
+                        Image(systemName: memory.isFavorited ? "heart.fill" : "heart")
+                            .foregroundColor(memory.isFavorited ? .budsError : .budsTextSecondary)
+                            .font(.title3)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-            }
 
-            // Timestamp
-            Text(memory.relativeTimestamp)
-                .font(.budsCaption)
-                .foregroundColor(.secondary)
-
-            Divider()
-
-            // Photo (if present)
-            if let imageData = memory.imageData,
-               let uiImage = UIImage(data: imageData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxHeight: 200)
-                    .clipped()
-                    .cornerRadius(BudsRadius.small)
-            }
-
-            // Notes (truncated)
-            if let notes = memory.notes, !notes.isEmpty {
-                Text(notes)
-                    .font(.budsBody)
-                    .lineLimit(3)
-            }
-
-            // Brand (if present)
-            if let brand = memory.brand {
+                // Rating + timestamp
                 HStack {
-                    Image(systemName: "tag.fill")
+                    HStack(spacing: 3) {
+                        ForEach(0..<5) { index in
+                            Image(systemName: index < memory.rating ? "star.fill" : "star")
+                                .foregroundColor(.budsWarning)
+                                .font(.caption2)
+                        }
+                    }
+
+                    Text("•")
+                        .foregroundColor(.budsTextSecondary)
                         .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(brand)
-                        .font(.budsCaption)
-                        .foregroundColor(.secondary)
+
+                    Text(memory.relativeTimestamp)
+                        .font(.caption)
+                        .foregroundColor(.budsTextSecondary)
+
+                    Spacer()
                 }
             }
+            .padding(BudsSpacing.m)
+            .background(
+                LinearGradient(
+                    colors: [Color.budsPrimary.opacity(0.08), Color.budsPrimary.opacity(0.02)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
 
-            // Rating + Effects
-            HStack {
-                // Stars
-                HStack(spacing: 2) {
-                    ForEach(0..<5) { index in
-                        Image(systemName: index < memory.rating ? "star.fill" : "star")
-                            .foregroundColor(.budsWarning)
+            // Photos (if present)
+            if !memory.imageData.isEmpty {
+                ImageCarousel(images: memory.imageData, maxHeight: 180, cornerRadius: 0, onTap: onTap)
+            }
+
+            // Content section
+            VStack(alignment: .leading, spacing: BudsSpacing.s) {
+                // Notes (truncated)
+                if let notes = memory.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.budsBody)
+                        .foregroundColor(.budsTextPrimary)
+                        .lineLimit(2)
+                }
+
+                // Effects chips
+                if !memory.effects.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(memory.effects.prefix(5), id: \.self) { effect in
+                                EffectTag(effect: effect)
+                            }
+                            if memory.effects.count > 5 {
+                                Text("+\(memory.effects.count - 5)")
+                                    .font(.caption2)
+                                    .foregroundColor(.budsTextSecondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(BudsRadius.pill)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+                    .padding(.vertical, 2)
+
+                // Bottom metadata
+                HStack(spacing: BudsSpacing.m) {
+                    // Brand
+                    if let brand = memory.brand {
+                        HStack(spacing: 4) {
+                            Image(systemName: "tag.fill")
+                                .font(.caption2)
+                                .foregroundColor(.budsPrimary)
+                            Text(brand)
+                                .font(.caption)
+                                .foregroundColor(.budsTextPrimary)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Share indicator
+                    HStack(spacing: 4) {
+                        Image(systemName: memory.isShared ? "person.2.fill" : "lock.fill")
+                            .font(.caption2)
+                            .foregroundColor(memory.isShared ? .budsSuccess : .budsTextSecondary)
+                        Text(memory.isShared ? "Shared" : "Private")
                             .font(.caption)
-                    }
-                }
-
-                Spacer()
-
-                // Effects
-                HStack(spacing: 4) {
-                    ForEach(memory.effects.prefix(3), id: \.self) { effect in
-                        EffectTag(effect: effect)
-                    }
-                    if memory.effects.count > 3 {
-                        Text("+\(memory.effects.count - 3)")
-                            .font(.budsTag)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.budsTextSecondary)
                     }
                 }
             }
-
-            // Location + Share indicator
-            HStack {
-                if memory.hasLocation, let locationName = memory.locationName {
-                    Label(locationName, systemImage: "location.fill")
-                        .font(.budsCaption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: memory.isShared ? "globe" : "lock.fill")
-                    .font(.caption)
-                    .foregroundColor(memory.isShared ? .budsInfo : .secondary)
-
-                if memory.isShared {
-                    Text("Shared")
-                        .font(.budsCaption)
-                        .foregroundColor(.budsInfo)
-                }
-            }
+            .padding(BudsSpacing.m)
         }
-        .budsPadding()
         .background(Color.budsSurface)
         .cornerRadius(BudsRadius.medium)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .shadow(color: Color.budsPrimary.opacity(0.12), radius: 12, x: 0, y: 4)
         .onTapGesture(perform: onTap)
     }
 }

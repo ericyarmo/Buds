@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import GRDB
 
 actor ReceiptManager {
     static let shared = ReceiptManager()

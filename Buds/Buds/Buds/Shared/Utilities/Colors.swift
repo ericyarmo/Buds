@@ -9,20 +9,17 @@ import SwiftUI
 
 extension Color {
     // MARK: - Primary Palette
-
-    static let budsPrimary = Color(hex: "#4CAF50")      // Cannabis green
+    // Note: budsPrimary defined in Assets.xcassets
     static let budsSecondary = Color(hex: "#8BC34A")    // Light green
     static let budsAccent = Color(hex: "#FF6B35")       // Orange CTA
 
     // MARK: - Backgrounds
-
     static let budsBackground = Color(hex: "#F5F5F5")   // Light gray
-    static let budsSurface = Color.white
+    // Note: budsSurface defined in Assets.xcassets
     static let budsSurfaceDark = Color(hex: "#1E1E1E")
 
     // MARK: - Semantic
-
-    static let budsSuccess = Color(hex: "#4CAF50")
+    // Note: budsSuccess defined in Assets.xcassets
     static let budsWarning = Color(hex: "#FFC107")
     static let budsError = Color(hex: "#F44336")
     static let budsInfo = Color(hex: "#2196F3")

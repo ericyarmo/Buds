@@ -30,7 +30,7 @@ actor IdentityManager {
     }
 
     /// Sign data with Ed25519
-    func sign(data: Data) throws -> Data {
+    func sign(data: Data) async throws -> Data {
         let privateKey = try getSigningKeypair()
         return try privateKey.signature(for: data)
     }
@@ -190,14 +190,26 @@ struct Base58 {
             }
         }
 
-        // Convert to base58
-        var num = bytes.reduce(0) { $0 * 256 + Int($1) }
+        // Convert to base58 using digit-by-digit encoding (avoids overflow)
+        var digits: [Int] = []
 
-        while num > 0 {
-            let remainder = num % base
-            num = num / base
-            let index = alphabet.index(alphabet.startIndex, offsetBy: remainder)
-            encoded = String(alphabet[index]) + encoded
+        for byte in bytes {
+            var carry = Int(byte)
+            for i in 0..<digits.count {
+                carry = digits[i] * 256 + carry
+                digits[i] = carry % base
+                carry = carry / base
+            }
+            while carry > 0 {
+                digits.append(carry % base)
+                carry = carry / base
+            }
+        }
+
+        // Convert digits to string (reverse order)
+        for digit in digits.reversed() {
+            let index = alphabet.index(alphabet.startIndex, offsetBy: digit)
+            encoded.append(alphabet[index])
         }
 
         // Add leading '1's for leading zeros
@@ -206,7 +218,6 @@ struct Base58 {
     }
 
     static func decode(_ string: String) -> Data? {
-        var num = 0
         var leadingZeros = 0
 
         for char in string {
@@ -217,18 +228,27 @@ struct Base58 {
             }
         }
 
+        // Decode using digit-by-digit approach (avoids overflow)
+        var bytes: [UInt8] = []
+
         for char in string {
             guard let index = alphabet.firstIndex(of: char) else { return nil }
-            num = num * base + alphabet.distance(from: alphabet.startIndex, to: index)
+            let digit = alphabet.distance(from: alphabet.startIndex, to: index)
+
+            var carry = digit
+            for i in 0..<bytes.count {
+                carry = Int(bytes[i]) * base + carry
+                bytes[i] = UInt8(carry % 256)
+                carry = carry / 256
+            }
+            while carry > 0 {
+                bytes.append(UInt8(carry % 256))
+                carry = carry / 256
+            }
         }
 
-        var bytes = [UInt8]()
-        while num > 0 {
-            bytes.insert(UInt8(num % 256), at: 0)
-            num /= 256
-        }
-
-        // Add leading zeros
+        // Reverse to get proper byte order and add leading zeros
+        bytes.reverse()
         bytes.insert(contentsOf: [UInt8](repeating: 0, count: leadingZeros), at: 0)
 
         return Data(bytes)

@@ -31,6 +31,9 @@
 		58FFD9622EF2907500C0A7DB /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 58FFD9612EF2907500C0A7DB /* GRDB */; };
 		58FFD9652EF291B100C0A7DB /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 58FFD9642EF291B100C0A7DB /* FirebaseAuth */; };
 		58FFD9672EF291B100C0A7DB /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 58FFD9662EF291B100C0A7DB /* FirebaseMessaging */; };
+		58FFD9782EF345DB00C0A7DB /* PhotoPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9772EF345DB00C0A7DB /* PhotoPicker.swift */; };
+		58FFD97C2EF3462500C0A7DB /* MemoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD97B2EF3462500C0A7DB /* MemoryDetailView.swift */; };
+		58FFD9822EF3470A00C0A7DB /* ImageCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9812EF3470A00C0A7DB /* ImageCarousel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +78,10 @@
 		58FFD9452EF2900D00C0A7DB /* EffectTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EffectTag.swift; sourceTree = "<group>"; };
 		58FFD9462EF2900D00C0A7DB /* MemoryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCard.swift; sourceTree = "<group>"; };
 		58FFD9492EF2900D00C0A7DB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		58FFD9682EF32D5200C0A7DB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		58FFD9772EF345DB00C0A7DB /* PhotoPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPicker.swift; sourceTree = "<group>"; };
+		58FFD97B2EF3462500C0A7DB /* MemoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryDetailView.swift; sourceTree = "<group>"; };
+		58FFD9812EF3470A00C0A7DB /* ImageCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCarousel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -198,6 +205,7 @@
 		58FFD93A2EF2900D00C0A7DB /* CreateMemory */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9772EF345DB00C0A7DB /* PhotoPicker.swift */,
 				58FFD9392EF2900D00C0A7DB /* CreateMemoryView.swift */,
 			);
 			path = CreateMemory;
@@ -206,6 +214,7 @@
 		58FFD93C2EF2900D00C0A7DB /* Timeline */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD97B2EF3462500C0A7DB /* MemoryDetailView.swift */,
 				58FFD93B2EF2900D00C0A7DB /* TimelineView.swift */,
 			);
 			path = Timeline;
@@ -242,6 +251,7 @@
 		58FFD9472EF2900D00C0A7DB /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9812EF3470A00C0A7DB /* ImageCarousel.swift */,
 				58FFD9452EF2900D00C0A7DB /* EffectTag.swift */,
 				58FFD9462EF2900D00C0A7DB /* MemoryCard.swift */,
 			);
@@ -260,6 +270,7 @@
 		58FFD94A2EF2900D00C0A7DB /* Buds */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9682EF32D5200C0A7DB /* Info.plist */,
 				58FFD9292EF2900D00C0A7DB /* App */,
 				58FFD9382EF2900D00C0A7DB /* Core */,
 				58FFD93E2EF2900D00C0A7DB /* Features */,
@@ -431,12 +442,15 @@
 				58FFD9552EF2900D00C0A7DB /* Database.swift in Sources */,
 				58FFD9562EF2900D00C0A7DB /* Memory.swift in Sources */,
 				58FFD9572EF2900D00C0A7DB /* UCRHeader.swift in Sources */,
+				58FFD9782EF345DB00C0A7DB /* PhotoPicker.swift in Sources */,
 				58FFD9582EF2900D00C0A7DB /* CreateMemoryView.swift in Sources */,
 				58FFD9592EF2900D00C0A7DB /* TimelineView.swift in Sources */,
 				58FFD95A2EF2900D00C0A7DB /* MainTabView.swift in Sources */,
+				58FFD97C2EF3462500C0A7DB /* MemoryDetailView.swift in Sources */,
 				58FFD95B2EF2900D00C0A7DB /* Colors.swift in Sources */,
 				58FFD95C2EF2900D00C0A7DB /* Spacing.swift in Sources */,
 				58FFD95D2EF2900D00C0A7DB /* Typography.swift in Sources */,
+				58FFD9822EF3470A00C0A7DB /* ImageCarousel.swift in Sources */,
 				58FFD95E2EF2900D00C0A7DB /* EffectTag.swift in Sources */,
 				58FFD95F2EF2900D00C0A7DB /* MemoryCard.swift in Sources */,
 			);
@@ -603,25 +617,34 @@
 				DEVELOPMENT_TEAM = UVF3TRAKZM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_FILE = Buds/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Buds needs camera access to capture photos of your cannabis memories.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Buds needs permission to save photos to your library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Buds needs photo library access to select and save cannabis memory photos.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UIStatusBarStyle = "";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = app.getbuds.Buds;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -635,25 +658,34 @@
 				DEVELOPMENT_TEAM = UVF3TRAKZM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_FILE = Buds/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Buds needs camera access to capture photos of your cannabis memories.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Buds needs permission to save photos to your library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Buds needs photo library access to select and save cannabis memory photos.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UIStatusBarStyle = "";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = app.getbuds.Buds;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

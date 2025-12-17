@@ -44,11 +44,7 @@ struct CanonicalCBOREncoder {
 
 import CryptoKit
 
-extension SHA256 {
-    static func hash(data: Data) -> SHA256Digest {
-        return SHA256.hash(data: data)
-    }
-}
+// Note: SHA256.hash(data:) is already available from CryptoKit, no extension needed
 
 // MARK: - Base32 Encoding (RFC 4648)
 // Lowercase alphabet for CIDv1 (matches BudsKernelGolden implementation)

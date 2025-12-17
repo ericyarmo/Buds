@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct TimelineView: View {
     @StateObject private var viewModel = TimelineViewModel()
@@ -25,6 +26,7 @@ struct TimelineView: View {
                 }
             }
             .navigationTitle("Timeline")
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -36,8 +38,22 @@ struct TimelineView: View {
                     }
                 }
             }
-            .sheet(isPresented: $viewModel.showCreateSheet) {
+            .sheet(isPresented: $viewModel.showCreateSheet, onDismiss: {
+                // Reload memories when create sheet is dismissed
+                Task {
+                    await viewModel.loadMemories()
+                }
+            }) {
                 CreateMemoryView()
+            }
+            .sheet(item: $viewModel.selectedMemory) { memory in
+                MemoryDetailView(memory: memory)
+                    .onDisappear {
+                        // Reload memories when detail view is dismissed
+                        Task {
+                            await viewModel.loadMemories()
+                        }
+                    }
             }
             .task {
                 await viewModel.loadMemories()
@@ -52,15 +68,12 @@ struct TimelineView: View {
 
     private var emptyState: some View {
         VStack(spacing: BudsSpacing.l) {
-            Text("🌿")
-                .font(.system(size: 60))
-
             Text("No memories yet")
                 .font(.budsHeadline)
 
             Text("Tap + to create your first cannabis memory")
                 .font(.budsBody)
-                .foregroundColor(.secondary)
+                .foregroundColor(.black.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, BudsSpacing.xl)
 

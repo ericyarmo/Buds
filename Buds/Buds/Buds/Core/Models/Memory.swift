@@ -39,7 +39,7 @@ struct Memory: Identifiable, Codable {
     // Metadata
     var isFavorited: Bool
     var isShared: Bool
-    var imageData: Data?
+    var imageData: [Data]  // Array of up to 3 images
 
     // MARK: - Computed Properties
 
@@ -143,7 +143,7 @@ extension Memory {
             locationName: "Home",
             isFavorited: false,
             isShared: false,
-            imageData: nil
+            imageData: []
         )
     }
 
@@ -169,7 +169,7 @@ extension Memory {
                 locationName: nil,
                 isFavorited: true,
                 isShared: true,
-                imageData: nil
+                imageData: []
             )
         ]
     }

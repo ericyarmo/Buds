@@ -74,14 +74,24 @@ enum ReceiptCanonicalizer {
             pairs.append((.text("brand"), .text(brand)))
         }
 
-        // thc_percentage (optional)
-        if let thc = payload.thcPercentage {
-            pairs.append((.text("thc_percentage"), .int(Int64(thc * 100))))  // Store as basis points
+        // thc_percent (optional)
+        if let thc = payload.thcPercent {
+            pairs.append((.text("thc_percent"), .int(Int64(thc * 100))))  // Store as basis points
         }
 
-        // cbd_percentage (optional)
-        if let cbd = payload.cbdPercentage {
-            pairs.append((.text("cbd_percentage"), .int(Int64(cbd * 100))))
+        // cbd_percent (optional)
+        if let cbd = payload.cbdPercent {
+            pairs.append((.text("cbd_percent"), .int(Int64(cbd * 100))))
+        }
+
+        // amount_grams (optional)
+        if let amount = payload.amountGrams {
+            pairs.append((.text("amount_grams"), .int(Int64(amount * 1000))))  // Store as milligrams
+        }
+
+        // location_cid (optional)
+        if let locationCID = payload.locationCID {
+            pairs.append((.text("location_cid"), .text(locationCID)))
         }
 
         return try enc.encode(.map(pairs))

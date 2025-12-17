@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct CreateMemoryView: View {
     @Environment(\.dismiss) private var dismiss
@@ -14,12 +15,20 @@ struct CreateMemoryView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // Photos (3 max)
+                Section {
+                    PhotoPicker(selectedImages: $viewModel.selectedImages)
+                } header: {
+                    Text("Photos (3 max)")
+                        .font(.budsCaption)
+                }
+
                 // Strain Name
                 Section {
                     TextField("Strain name", text: $viewModel.strainName)
                         .font(.budsBody)
                 } header: {
-                    Text("🌿 What did you smoke?")
+                    Text("Strain")
                         .font(.budsCaption)
                 }
 
@@ -27,15 +36,12 @@ struct CreateMemoryView: View {
                 Section {
                     Picker("Type", selection: $viewModel.productType) {
                         ForEach(ProductType.allCases, id: \.self) { type in
-                            HStack {
-                                Text(type.emoji)
-                                Text(type.displayName)
-                            }
-                            .tag(type)
+                            Text(type.displayName).tag(type)
                         }
                     }
+                    .tint(.budsPrimary)
                 } header: {
-                    Text("📦 Product Type")
+                    Text("Type")
                 }
 
                 // Rating
@@ -49,20 +55,43 @@ struct CreateMemoryView: View {
                                     .foregroundColor(star <= viewModel.rating ? .budsWarning : .gray)
                                     .font(.title2)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                 } header: {
-                    Text("⭐ Rating")
+                    Text("Rating")
                 }
 
                 // Notes
                 Section {
-                    TextEditor(text: $viewModel.notes)
-                        .frame(minHeight: 100)
-                        .font(.budsBody)
+                    ZStack(alignment: .topLeading) {
+                        if viewModel.notes.isEmpty {
+                            Text("How did it make you feel? What did you do?")
+                                .foregroundColor(.secondary)
+                                .font(.budsBody)
+                                .padding(.top, 8)
+                                .padding(.leading, 4)
+                        }
+                        TextEditor(text: $viewModel.notes)
+                            .frame(minHeight: 100)
+                            .font(.budsBody)
+                            .scrollContentBackground(.hidden)
+                            .onChange(of: viewModel.notes) { _, newValue in
+                                if newValue.count > 500 {
+                                    viewModel.notes = String(newValue.prefix(500))
+                                }
+                            }
+                    }
+
+                    HStack {
+                        Spacer()
+                        Text("\(viewModel.notes.count)/500")
+                            .font(.budsCaption)
+                            .foregroundColor(viewModel.notes.count > 450 ? .budsWarning : .secondary)
+                    }
                 } header: {
-                    Text("📝 Notes")
+                    Text("Notes")
                 }
 
                 // Effects
@@ -73,10 +102,10 @@ struct CreateMemoryView: View {
                         }
                     }
                 } header: {
-                    Text("😊 Effects (tap to add)")
+                    Text("Effects")
                 }
 
-                // Optional: Product Details
+                // Product Details (Optional)
                 Section {
                     TextField("Brand (optional)", text: $viewModel.brand)
                     TextField("THC%", value: $viewModel.thcPercent, format: .number)
@@ -84,7 +113,7 @@ struct CreateMemoryView: View {
                     TextField("CBD%", value: $viewModel.cbdPercent, format: .number)
                         .keyboardType(.decimalPad)
                 } header: {
-                    Text("Product Details (Optional)")
+                    Text("Product Details (optional)")
                 }
 
                 // Consumption Method
@@ -92,15 +121,12 @@ struct CreateMemoryView: View {
                     Picker("Method", selection: $viewModel.consumptionMethod) {
                         Text("Not specified").tag(nil as ConsumptionMethod?)
                         ForEach(ConsumptionMethod.allCases, id: \.self) { method in
-                            HStack {
-                                Text(method.emoji)
-                                Text(method.displayName)
-                            }
-                            .tag(method as ConsumptionMethod?)
+                            Text(method.displayName).tag(method as ConsumptionMethod?)
                         }
                     }
+                    .tint(.budsPrimary)
                 } header: {
-                    Text("💨 Method")
+                    Text("Method")
                 }
             }
             .navigationTitle("New Memory")
@@ -153,6 +179,7 @@ struct CreateMemoryView: View {
                 )
                 .cornerRadius(BudsRadius.pill)
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -160,6 +187,7 @@ struct CreateMemoryView: View {
 
 @MainActor
 final class CreateMemoryViewModel: ObservableObject {
+    @Published var selectedImages: [Data] = []
     @Published var strainName = ""
     @Published var productType: ProductType = .flower
     @Published var rating = 3
@@ -189,7 +217,7 @@ final class CreateMemoryViewModel: ObservableObject {
 
     func save() async {
         do {
-            _ = try await repository.create(
+            let memory = try await repository.create(
                 strainName: strainName,
                 productType: productType,
                 rating: rating,
@@ -202,8 +230,14 @@ final class CreateMemoryViewModel: ObservableObject {
                 consumptionMethod: consumptionMethod
             )
 
-            print("✅ Memory created successfully")
+            // Add images if any were selected
+            if !selectedImages.isEmpty {
+                try await repository.addImages(to: memory.id, images: selectedImages)
+            }
+
+            print("✅ Memory created successfully with \(selectedImages.count) images")
         } catch {
+            print("❌ Failed to create memory: \(error)")
             errorMessage = error.localizedDescription
             showError = true
         }

@@ -1,234 +1,267 @@
-# Buds - Xcode Setup Instructions
+# Buds v0.1 - Setup Instructions
 
-**Ready to run!** All code is wired. Follow these steps to create the Xcode project and run on simulator.
+This guide walks you through setting up the Buds project on your Mac and running it in the iOS Simulator.
+
+**Estimated time:** 10-15 minutes
 
 ---
 
-## Step 1: Create Xcode Project
+## Prerequisites
+
+- **macOS 13+** (Sonoma or later recommended)
+- **Xcode 15+** (download from [App Store](https://apps.apple.com/us/app/xcode/id497799835))
+- **Git** (check with `git --version` in Terminal)
+- **Apple Developer Account** (free - not required for simulator testing)
+
+---
+
+## Step 1: Clone the Repository
 
 ```bash
-# Open Xcode
-# File > New > Project
-# Select: iOS > App
-```
-
-**Project Settings:**
-- **Product Name:** Buds
-- **Team:** Your Apple Developer team (or Personal Team for simulator testing)
-- **Organization Identifier:** `app.getbuds` (or your domain)
-- **Bundle Identifier:** Will be `app.getbuds.Buds`
-- **Interface:** SwiftUI
-- **Language:** Swift
-- **Include Tests:** ✓ Yes
-
-**Save Location:**
-```
-/Users/ericyarmolinsky/Developer/Buds/
-```
-
-**Important:** This will create `/Users/ericyarmolinsky/Developer/Buds/Buds.xcodeproj` in the same folder as this README.
-
----
-
-## Step 2: Replace Default Files
-
-Xcode created some default files. We'll replace them:
-
-1. **Delete these default files** (select in Xcode, right-click > Delete > Move to Trash):
-   - `ContentView.swift`
-   - `BudsApp.swift` (we have our own version)
-
-2. **Add our files to the project:**
-   - In Finder, drag the entire `Buds/` folder into Xcode sidebar
-   - **IMPORTANT:** When prompted, select:
-     - ✓ Copy items if needed
-     - ✓ Create groups (not folder references)
-     - ✓ Add to targets: Buds
-
-Your project should now have this structure:
-```
-Buds (project)
-├── Buds (group)
-│   ├── App/
-│   ├── Core/
-│   ├── Features/
-│   ├── Shared/
-│   └── Resources/
-└── BudsTests/
+# Clone the Buds repo (update URL based on your GitHub setup)
+git clone https://github.com/YOUR_USERNAME/Buds.git
+cd Buds
 ```
 
 ---
 
-## Step 3: Add Dependencies via Swift Package Manager
+## Step 2: Open the Xcode Project
 
-In Xcode:
+The Xcode project is located in the `Buds/Buds/` directory.
 
-### 1. Add GRDB
-- File > Add Package Dependencies
-- Search: `https://github.com/groue/GRDB.swift`
-- Version: Up to Next Major (6.24.0 or latest)
-- Click **Add Package**
-- Select **GRDB** library
-- Click **Add Package**
+```bash
+# Navigate to the project directory
+cd Buds/Buds
 
-### 2. Add Firebase
-- File > Add Package Dependencies
-- Search: `https://github.com/firebase/firebase-ios-sdk`
-- Version: Up to Next Major (10.20.0 or latest)
-- Click **Add Package**
-- Select these libraries:
-  - **FirebaseAuth**
-  - **FirebaseMessaging**
-- Click **Add Package**
-
-### 3. Add SwiftCBOR (for canonical encoding)
-- File > Add Package Dependencies
-- Search: `https://github.com/unrelenting-technology/SwiftCBOR`
-- Version: Up to Next Major (0.4.5 or latest)
-- Click **Add Package**
-- Select **SwiftCBOR** library
-- Click **Add Package**
-
-**Wait for packages to resolve** (check bottom of Xcode window for progress).
-
----
-
-## Step 4: Configure Build Settings
-
-### A. Set Minimum iOS Version
-
-1. Click project name in sidebar (blue icon)
-2. Select **Buds** target (under TARGETS)
-3. General tab
-4. Set **Minimum Deployments** to: **iOS 17.0**
-
-### B. Enable Strict Concurrency (Swift 6)
-
-1. Still in target settings
-2. Go to **Build Settings** tab
-3. Search for "strict concurrency"
-4. Set **Strict Concurrency Checking** to: **Complete**
-
-### C. Add Info.plist Entries
-
-The `Info-Template.plist` has all the keys you need. Add them to your target:
-
-1. Select **Buds** target
-2. Go to **Info** tab
-3. Add these custom keys (click +):
-
-```
-NSPhotoLibraryUsageDescription = "To add photos to your cannabis memories"
-NSCameraUsageDescription = "To capture photos of your experiences"
-NSLocationWhenInUseUsageDescription = "To remember where you had your experiences (optional, off by default)"
+# Open in Xcode
+open Buds.xcodeproj
 ```
 
-Or just copy the entire `Info-Template.plist` content into your project's `Info.plist`.
+Xcode should open and show the project structure.
 
 ---
 
-## Step 5: Firebase Setup (Optional for First Run)
+## Step 3: Install Swift Package Dependencies
 
-**You can skip this for now** to test locally without Firebase. The app will print a warning but still work.
+Xcode should automatically resolve dependencies from `Package.swift`. If not:
 
-When ready to add Firebase:
+1. In Xcode menu: **File → Add Packages**
+2. Add the following SPM packages (if not already added):
 
-1. Go to https://console.firebase.google.com
-2. Create new project: "Buds Dev"
-3. Add iOS app:
-   - Bundle ID: `app.getbuds.Buds`
-   - Download `GoogleService-Info.plist`
-   - Drag into Xcode under `Resources/` folder
-   - ✓ Ensure "Copy items if needed"
-   - ✓ Add to target: Buds
+### Required Dependencies
+
+#### GRDB (Database)
+- **Package URL:** `https://github.com/groue/GRDB.swift`
+- **Version:** 6.20+ (latest)
+- **Products:** Select `GRDB`
+
+#### Firebase iOS SDK (Optional for local testing)
+- **Package URL:** `https://github.com/firebase/firebase-ios-sdk`
+- **Version:** 10.20+ (latest)
+- **Products:** Select `FirebaseCore`
+- **Note:** Firebase is optional for local simulator testing. You can skip this for now and enable it later when adding phone authentication.
+
+#### SwiftCBOR (CBOR Encoding)
+- **Package URL:** `https://github.com/myaut/SwiftCBOR`
+- **Version:** Latest
+- **Products:** Select `SwiftCBOR`
+
+### How to Add Packages in Xcode
+
+1. **File → Add Packages**
+2. Paste the URL in the search box
+3. Select the correct version
+4. Click **Add Package**
+5. Select the target `Buds` when prompted
+6. Click **Add Package** again to confirm
 
 ---
 
-## Step 6: Build & Run!
+## Step 4: Select Build Target
 
-1. Select **iPhone 15 Pro** simulator (or any iOS 17+ device)
-2. Click **▶️ Run** button (or `Cmd+R`)
+Ensure you're building for the correct target:
 
-**Expected result:**
-- App launches
-- You see "🌿 No memories yet" empty state
-- Tap **+** button → Create memory form opens
-- Fill in strain name, rating, etc.
-- Tap **Save** → Memory appears in timeline!
+1. In Xcode, select the **Buds** project (left sidebar)
+2. Select the **Buds** target
+3. Go to **Build Settings** tab
+4. Search for "iOS Deployment Target" and ensure it's set to **14.0+**
+
+---
+
+## Step 5: Select Simulator
+
+1. At the top of Xcode, click the device selector (next to the play button)
+2. Choose a simulator: **iPhone 15** or **iPhone 15 Pro** (recommended)
+3. If no simulators are available:
+   - **Xcode → Settings → Locations → Runtimes**
+   - Download iOS 18+ runtime
+
+---
+
+## Step 6: Build and Run
+
+### Option 1: Using Xcode UI
+1. Press **Cmd + R** to build and run
+2. Wait for the simulator to launch (first build takes 2-3 minutes)
+3. The Buds app should open in the simulator
+
+### Option 2: Using Terminal
+```bash
+# Build for simulator
+xcodebuild build -scheme Buds -destination "generic/platform=iOS Simulator"
+
+# Run the app (if you have the app set up)
+xcodebuild test -scheme Buds -destination "platform=iOS Simulator,name=iPhone 15"
+```
+
+---
+
+## Step 7: Test the App
+
+Once running, you should see:
+
+1. **Timeline View** (default tab)
+   - Shows "No memories yet" message
+   - Tap the **+** button to create a new memory
+
+2. **Create Memory Flow**
+   - Fill in the strain name (required)
+   - Select product type (flower, edible, etc.)
+   - Set a rating (1-5 stars)
+   - Add optional notes
+   - Select effects (relaxed, creative, etc.)
+   - Add optional product details (brand, THC%, CBD%)
+   - Select consumption method (joint, bong, etc.)
+   - Tap **Save**
+
+3. **Verify Creation**
+   - Return to Timeline
+   - Your memory should appear as a card
+   - Pull down to refresh if needed
+
+---
+
+## Step 8: Check Database
+
+Memories are stored in SQLite locally. To verify:
+
+### Using Command Line
+```bash
+# Find the database file (if running on simulator)
+find ~/Library/Developer/CoreSimulator/Devices -name "*.db" | grep -i buds
+```
+
+### Using TablePlus (GUI)
+1. Download [TablePlus](https://tableplus.com/) (free)
+2. **File → Open**
+3. Navigate to the database file
+4. View tables: `local_receipts`, `ucr_headers`, etc.
 
 ---
 
 ## Troubleshooting
 
-### Build fails: "Cannot find 'Database' in scope"
+### Build Fails with "Cannot find GRDB in scope"
+**Solution:**
+1. Delete derived data: **Xcode → Settings → Locations → Derived Data** (click arrow)
+2. Delete the folder
+3. Rebuild with **Cmd + Shift + K** then **Cmd + B**
 
-**Fix:** Clean build folder and rebuild
-```bash
-Cmd+Shift+K (clean)
-Cmd+B (build)
-```
+### Simulator Won't Launch
+**Solution:**
+1. Kill Xcode completely
+2. Quit Simulator: **Simulator → Device → Reset or → Erase All Content and Settings**
+3. Restart Xcode and try again
 
-### Build fails: "Missing import for GRDB"
+### "App Installation Failed"
+**Solution:**
+1. Delete the app from the simulator: Long-press the Buds app → Remove App
+2. Clean build folder: **Cmd + Shift + K**
+3. Rebuild: **Cmd + B**
 
-**Fix:** Package dependencies didn't resolve
-- File > Packages > Resolve Package Versions
-- Wait for completion, then build again
+### Database Locked Error
+**Solution:**
+1. The database is used by the app. If you see "database is locked" errors:
+2. Restart the simulator
+3. Or reset the app: Simulator → Device → Reset
 
-### Firebase warnings in console
-
-**Expected if you haven't added GoogleService-Info.plist yet.**
-```
-⚠️ Firebase not configured (expected for local testing)
-```
-
-This is fine! The app works without Firebase for local-only testing.
-
-### "No memories appear after saving"
-
-**Check console for:**
-```
-✅ Created receipt: bafyrei...
-✅ Memory created successfully
-```
-
-If you see errors, check:
-- Database initialized? Look for: `✅ Database initialized at: ...`
-- Receipt signed? Look for: `✅ Generated new Ed25519 signing keypair`
-
-### Keychain errors in simulator
-
-**Fix:** Reset simulator
-```bash
-Device > Erase All Content and Settings
-```
-
-Then rebuild and run.
+### Firebase Not Found
+**Solution:**
+- Firebase is optional for local testing
+- If you see Firebase errors, disable it in `BudsApp.swift` (already handled)
+- The app works perfectly without Firebase on the simulator
 
 ---
 
-## What's Working Now
+## Next Steps
 
-✅ **Database:** GRDB with all 7 tables
-✅ **Receipts:** Canonical CBOR encoding + Ed25519 signing
-✅ **Identity:** Ed25519/X25519 keypairs + DID generation
-✅ **UI:** Timeline, Create Memory form, Memory cards
-✅ **Core Flow:** Create memory → Sign receipt → Store in DB → Display in timeline
+Once you've verified the app runs:
 
----
-
-## Next Steps (After First Run)
-
-1. **Test creating 3-5 memories** to see timeline populate
-2. **Add Firebase** (for phone auth in future)
-3. **Test on real device** (sign with your Apple Developer account)
-4. **Continue building:**
-   - Map view
-   - Location capture
-   - Circle sharing (E2EE)
-   - Agent integration
-
-See [DEVELOPMENT_ROADMAP.md](./docs/DEVELOPMENT_ROADMAP.md) for full build plan.
+1. **Create a few test memories** to populate the timeline
+2. **Read [ARCHITECTURE.md](./docs/ARCHITECTURE.md)** to understand the system design
+3. **Read [CANONICALIZATION_SPEC.md](./docs/CANONICALIZATION_SPEC.md)** to understand receipt signing
+4. **Check [NEXT_PHASE_PLAN.md](./NEXT_PHASE_PLAN.md)** for the roadmap
 
 ---
 
-**Ready? Let's ship! 🚀🌿**
+## Key Project Structure
+
+```
+Buds/
+├── Buds/                           # iOS app
+│   ├── Buds/
+│   │   ├── App/
+│   │   │   └── BudsApp.swift       # App entry point
+│   │   ├── Core/
+│   │   │   ├── ChaingeKernel/      # Receipt signing + CBOR
+│   │   │   ├── Database/           # GRDB setup + migrations
+│   │   │   └── Models/             # UCRHeader, Memory, etc.
+│   │   ├── Features/
+│   │   │   ├── Timeline/           # Main feed
+│   │   │   ├── CreateMemory/       # Form to create memories
+│   │   │   └── MainTabView.swift   # Tab navigation
+│   │   └── Shared/
+│   │       ├── Utilities/          # Colors, Typography, Spacing
+│   │       └── Views/              # MemoryCard, EffectTag, etc.
+│   └── BudsTests/                  # Unit tests
+├── docs/                           # Architecture documentation
+├── BudsKernelGolden/               # Physics-tested crypto kernel
+└── README.md                       # Project overview
+```
+
+---
+
+## Performance Notes
+
+**Receipt Creation Performance:**
+- Encode + CID + Sign: **0.11ms p50** (from BudsKernelGolden tests)
+- Operations are non-blocking (async/await)
+- UI stays responsive
+
+**Database Performance:**
+- GRDB is production-grade SQLite wrapper
+- Migrations run automatically on app launch
+- Supports up to millions of memories on-device
+
+---
+
+## Need Help?
+
+If you encounter issues:
+
+1. Check the **troubleshooting section** above
+2. Review logs in **Xcode Console** (Cmd + Shift + C)
+3. Try a clean build: **Cmd + Shift + K** then **Cmd + B**
+4. Check GitHub issues: https://github.com/YOUR_USERNAME/Buds/issues
+
+---
+
+## What's Next?
+
+See [NEXT_PHASE_PLAN.md](./NEXT_PHASE_PLAN.md) for:
+- Phase 3: Images + Memory Enhancement
+- Phase 4: Firebase Authentication
+- Phase 5: Cloudflare Relay Server
+- Phase 6: Circle Mechanics
+
+Enjoy building! 🌿
