@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Privacy Descriptions -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>To add photos to your cannabis memories</string>
+
+	<key>NSCameraUsageDescription</key>
+	<string>To capture photos of your cannabis experiences</string>
+
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>To remember where you had your experiences (optional, off by default)</string>
+
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This app does not track you. This permission is not used.</string>
+
+	<!-- Background Modes -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+
+	<!-- App Transport Security -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+	</dict>
+
+	<!-- Age Rating -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.lifestyle</string>
+
+	<!-- Display Settings -->
+	<key>UILaunchScreen</key>
+	<dict/>
+
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+</dict>
+</plist>

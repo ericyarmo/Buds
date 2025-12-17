@@ -1,0 +1,14 @@
+{
+  "did": "did:buds:local-ABC123",
+  "deviceId": "device-001",
+  "parentCID": null,
+  "rootCID": null,
+  "receiptType": "app.buds.session.created/v1",
+  "payload": {
+    "claimed_time_ms": 1704844800000,
+    "product_name": "Blue Dream",
+    "strain_type": "hybrid",
+    "notes": "Great for focus",
+    "rating": 5
+  }
+}
