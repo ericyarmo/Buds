@@ -9,11 +9,13 @@
 
 import SwiftUI
 import PhotosUI
-
+;
 struct PhotoPicker: View {
     @Binding var selectedImages: [Data]
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var showCamera = false
+    @State private var showPhotosPicker = false
+    @State private var selectedPhotoIndex: Int? = nil
 
     let maxPhotos: Int = 3
 
@@ -36,7 +38,17 @@ struct PhotoPicker: View {
                 addPhotoButton
             }
         }
-        .onChange(of: selectedItems) { _, newItems in
+        .onChange(of: selectedItems) { oldItems, newItems in
+            print("📸 PhotoPicker: onChange triggered")
+            print("📸 PhotoPicker: Old items count: \(oldItems.count)")
+            print("📸 PhotoPicker: New items count: \(newItems.count)")
+            print("📸 PhotoPicker: Current selectedImages: \(selectedImages.count)")
+
+            guard !newItems.isEmpty else {
+                print("📸 PhotoPicker: No items to load")
+                return
+            }
+
             Task {
                 await loadPhotos(from: newItems)
             }
@@ -54,33 +66,90 @@ struct PhotoPicker: View {
                 }
             )
         }
+        .photosPicker(
+            isPresented: $showPhotosPicker,
+            selection: $selectedItems,
+            maxSelectionCount: maxPhotos - selectedImages.count,
+            matching: .images
+        )
     }
 
     // MARK: - Photo Thumbnail
 
     private func photoThumbnail(_ imageData: Data, at index: Int) -> some View {
-        ZStack(alignment: .topTrailing) {
-            if let uiImage = UIImage(data: imageData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 80, height: 80)
-                    .clipped()
-                    .cornerRadius(BudsRadius.small)
+        VStack(spacing: 4) {
+            ZStack(alignment: .topTrailing) {
+                if let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 80, height: 80)
+                        .clipped()
+                        .cornerRadius(BudsRadius.small)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: BudsRadius.small)
+                                .stroke(selectedPhotoIndex == index ? Color.budsPrimary : Color.clear, lineWidth: 3)
+                        )
+                        .onTapGesture {
+                            withAnimation {
+                                selectedPhotoIndex = selectedPhotoIndex == index ? nil : index
+                            }
+                        }
+                }
+
+                // Delete button
+                Button {
+                    withAnimation {
+                        selectedImages.remove(at: index)
+                        selectedPhotoIndex = nil
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
+                }
+                .offset(x: 8, y: -8)
             }
 
-            // Delete button
-            Button {
-                selectedImages.remove(at: index)
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title3)
-                    .foregroundColor(.white)
-                    .background(Color.black.opacity(0.6))
-                    .clipShape(Circle())
+            // Reorder controls (show when selected)
+            if selectedPhotoIndex == index {
+                HStack(spacing: 12) {
+                    // Move left
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            movePhoto(from: index, direction: -1)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.left.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(index > 0 ? .budsPrimary : .gray.opacity(0.3))
+                    }
+                    .disabled(index == 0)
+
+                    // Move right
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            movePhoto(from: index, direction: 1)
+                        }
+                    } label: {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(index < selectedImages.count - 1 ? .budsPrimary : .gray.opacity(0.3))
+                    }
+                    .disabled(index == selectedImages.count - 1)
+                }
             }
-            .offset(x: 8, y: -8)
         }
+    }
+
+    private func movePhoto(from index: Int, direction: Int) {
+        let newIndex = index + direction
+        guard newIndex >= 0 && newIndex < selectedImages.count else { return }
+
+        selectedImages.swapAt(index, newIndex)
+        selectedPhotoIndex = newIndex
     }
 
     // MARK: - Add Photo Button
@@ -90,17 +159,9 @@ struct PhotoPicker: View {
             // Photo library option
             Button {
                 print("📸 PhotoPicker: Photo Library button tapped")
-                // Trigger PhotosPicker manually
+                showPhotosPicker = true
             } label: {
                 Label("Photo Library", systemImage: "photo.on.rectangle")
-            }
-
-            PhotosPicker(
-                selection: $selectedItems,
-                maxSelectionCount: maxPhotos - selectedImages.count,
-                matching: .images
-            ) {
-                Label("Select from Library", systemImage: "photo.stack")
             }
 
             // Camera option
@@ -132,13 +193,18 @@ struct PhotoPicker: View {
     // MARK: - Load Photos
 
     private func loadPhotos(from items: [PhotosPickerItem]) async {
-        print("📸 PhotoPicker: Loading \(items.count) items")
+        print("📸 PhotoPicker: Loading \(items.count) items from selection")
+        print("📸 PhotoPicker: Current selectedImages count: \(selectedImages.count)")
 
-        for item in items {
-            if selectedImages.count >= maxPhotos {
+        var newImages: [Data] = []
+
+        for (index, item) in items.enumerated() {
+            if selectedImages.count + newImages.count >= maxPhotos {
                 print("📸 PhotoPicker: Max photos reached")
                 break
             }
+
+            print("📸 PhotoPicker: Processing item \(index + 1)/\(items.count)")
 
             do {
                 if let data = try await item.loadTransferable(type: Data.self) {
@@ -147,22 +213,22 @@ struct PhotoPicker: View {
                     // Compress image if needed (max 2MB)
                     if let compressedData = compressImage(data) {
                         print("📸 PhotoPicker: Compressed to \(compressedData.count) bytes")
-                        await MainActor.run {
-                            selectedImages.append(compressedData)
-                        }
+                        newImages.append(compressedData)
                     } else {
                         print("❌ PhotoPicker: Failed to compress image")
                     }
                 } else {
-                    print("❌ PhotoPicker: Failed to load transferable data")
+                    print("❌ PhotoPicker: Failed to load transferable data for item \(index)")
                 }
             } catch {
-                print("❌ PhotoPicker: Error loading photo - \(error)")
+                print("❌ PhotoPicker: Error loading photo \(index) - \(error)")
             }
         }
 
-        // Clear selection
+        // Add all new images at once on main thread
         await MainActor.run {
+            selectedImages.append(contentsOf: newImages)
+            print("📸 PhotoPicker: Final selectedImages count: \(selectedImages.count)")
             selectedItems = []
         }
     }
@@ -192,44 +258,107 @@ struct CameraView: UIViewControllerRepresentable {
     let onCapture: (Data) -> Void
     let onCancel: () -> Void
 
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.sourceType = .camera
-        picker.delegate = context.coordinator
-        return picker
+    func makeUIViewController(context: Context) -> CameraViewController {
+        let cameraVC = CameraViewController()
+        cameraVC.onCapture = onCapture
+        cameraVC.onCancel = onCancel
+        return cameraVC
     }
 
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    func updateUIViewController(_ uiViewController: CameraViewController, context: Context) {}
+}
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onCapture: onCapture, onCancel: onCancel)
+// MARK: - Camera View Controller
+
+class CameraViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    var onCapture: ((Data) -> Void)?
+    var onCancel: (() -> Void)?
+
+    private var imagePicker: UIImagePickerController!
+    private var flipButton: UIButton!
+    private var currentCamera: UIImagePickerController.CameraDevice = .rear
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        setupImagePicker()
+        setupFlipButton()
     }
 
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let onCapture: (Data) -> Void
-        let onCancel: () -> Void
+    private func setupImagePicker() {
+        imagePicker = UIImagePickerController()
+        imagePicker.sourceType = .camera
+        imagePicker.cameraDevice = currentCamera
+        imagePicker.delegate = self
+        imagePicker.allowsEditing = false
 
-        init(onCapture: @escaping (Data) -> Void, onCancel: @escaping () -> Void) {
-            self.onCapture = onCapture
-            self.onCancel = onCancel
-        }
+        addChild(imagePicker)
+        view.addSubview(imagePicker.view)
+        imagePicker.view.frame = view.bounds
+        imagePicker.didMove(toParent: self)
+    }
 
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            print("📸 Camera: Captured image")
-            if let image = info[.originalImage] as? UIImage,
-               let imageData = image.jpegData(compressionQuality: 0.8) {
-                print("📸 Camera: Converted to JPEG (\(imageData.count) bytes)")
-                onCapture(imageData)
-            } else {
-                print("❌ Camera: Failed to convert image")
-                onCancel()
-            }
-        }
+    private func setupFlipButton() {
+        flipButton = UIButton(type: .system)
+        flipButton.setImage(UIImage(systemName: "camera.rotate"), for: .normal)
+        flipButton.tintColor = .white
+        flipButton.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        flipButton.layer.cornerRadius = 30
+        flipButton.translatesAutoresizingMaskIntoConstraints = false
+        flipButton.addTarget(self, action: #selector(flipCamera), for: .touchUpInside)
 
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            print("📸 Camera: Cancelled by user")
-            onCancel()
+        view.addSubview(flipButton)
+
+        NSLayoutConstraint.activate([
+            flipButton.widthAnchor.constraint(equalToConstant: 60),
+            flipButton.heightAnchor.constraint(equalToConstant: 60),
+            flipButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+            flipButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -100)
+        ])
+    }
+
+    @objc private func flipCamera() {
+        print("📸 Camera: Flipping camera")
+
+        // Toggle camera
+        currentCamera = currentCamera == .rear ? .front : .rear
+
+        // Recreate image picker with new camera
+        imagePicker.view.removeFromSuperview()
+        imagePicker.removeFromParent()
+
+        imagePicker = UIImagePickerController()
+        imagePicker.sourceType = .camera
+        imagePicker.cameraDevice = currentCamera
+        imagePicker.delegate = self
+        imagePicker.allowsEditing = false
+
+        addChild(imagePicker)
+        view.insertSubview(imagePicker.view, at: 0)
+        imagePicker.view.frame = view.bounds
+        imagePicker.didMove(toParent: self)
+
+        // Bring flip button to front
+        view.bringSubviewToFront(flipButton)
+    }
+
+    // MARK: - UIImagePickerControllerDelegate
+
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+        print("📸 Camera: Captured image")
+        if let image = info[.originalImage] as? UIImage,
+           let imageData = image.jpegData(compressionQuality: 0.8) {
+            print("📸 Camera: Converted to JPEG (\(imageData.count) bytes)")
+            onCapture?(imageData)
+        } else {
+            print("❌ Camera: Failed to convert image")
+            onCancel?()
         }
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        print("📸 Camera: Cancelled by user")
+        onCancel?()
     }
 }
 

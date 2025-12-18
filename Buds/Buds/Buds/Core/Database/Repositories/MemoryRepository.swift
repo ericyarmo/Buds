@@ -176,6 +176,8 @@ struct MemoryRepository {
 
     /// Add images to a memory (up to 3 total)
     func addImages(to memoryId: UUID, images: [Data]) async throws {
+        print("🗄️ MemoryRepo: addImages called with \(images.count) images for memory \(memoryId)")
+
         try await db.writeAsync { db in
             // Load current image CIDs
             let currentCIDsJSON = try String.fetchOne(
@@ -184,14 +186,22 @@ struct MemoryRepository {
                 arguments: [memoryId.uuidString]
             ) ?? "[]"
 
+            print("🗄️ MemoryRepo: Current CIDs JSON: \(currentCIDsJSON)")
             var imageCIDs = try JSONDecoder().decode([String].self, from: currentCIDsJSON.data(using: .utf8)!)
+            print("🗄️ MemoryRepo: Current CIDs array count: \(imageCIDs.count)")
 
             // Add new images (enforce 3 max)
-            for imageData in images {
-                if imageCIDs.count >= 3 { break }
+            for (index, imageData) in images.enumerated() {
+                if imageCIDs.count >= 3 {
+                    print("🗄️ MemoryRepo: Max 3 images reached, stopping at \(imageCIDs.count)")
+                    break
+                }
+
+                print("🗄️ MemoryRepo: Processing image \(index + 1)/\(images.count), size: \(imageData.count) bytes")
 
                 // Generate CID for image
                 let cid = try self.generateImageCID(data: imageData)
+                print("🗄️ MemoryRepo: Generated CID: \(cid)")
 
                 // Store in blobs table
                 try db.execute(
@@ -201,16 +211,21 @@ struct MemoryRepository {
                         """,
                     arguments: [cid, imageData, "image/jpeg", imageData.count, Date().timeIntervalSince1970]
                 )
+                print("🗄️ MemoryRepo: Inserted blob for CID: \(cid)")
 
                 imageCIDs.append(cid)
             }
 
             // Update local_receipts with new CIDs
             let updatedJSON = String(data: try JSONEncoder().encode(imageCIDs), encoding: .utf8)!
+            print("🗄️ MemoryRepo: Updating image_cids to: \(updatedJSON)")
+
             try db.execute(
                 sql: "UPDATE local_receipts SET image_cids = ?, updated_at = ? WHERE uuid = ?",
                 arguments: [updatedJSON, Date().timeIntervalSince1970, memoryId.uuidString]
             )
+
+            print("🗄️ MemoryRepo: Successfully stored \(imageCIDs.count) images")
         }
     }
 
@@ -251,19 +266,28 @@ struct MemoryRepository {
 
         // Load images from blobs table
         let imageCIDsJSON = (row["image_cids"] as? String) ?? "[]"
+        print("🗄️ MemoryRepo: Loading memory, image_cids JSON: \(imageCIDsJSON)")
+
         let imageCIDs = try JSONDecoder().decode([String].self, from: imageCIDsJSON.data(using: .utf8)!)
+        print("🗄️ MemoryRepo: Parsed \(imageCIDs.count) CIDs: \(imageCIDs)")
 
         // Fetch image data for each CID
         var imageData: [Data] = []
-        for cid in imageCIDs {
+        for (index, cid) in imageCIDs.enumerated() {
+            print("🗄️ MemoryRepo: Fetching blob for CID \(index + 1)/\(imageCIDs.count): \(cid)")
             if let data = try Data.fetchOne(
                 db,
                 sql: "SELECT data FROM blobs WHERE cid = ?",
                 arguments: [cid]
             ) {
+                print("🗄️ MemoryRepo: Found blob data: \(data.count) bytes")
                 imageData.append(data)
+            } else {
+                print("❌ MemoryRepo: No blob found for CID: \(cid)")
             }
         }
+
+        print("🗄️ MemoryRepo: Loaded \(imageData.count) images for memory")
 
         return Memory(
             id: UUID(uuidString: row["uuid"])!,

@@ -16,67 +16,111 @@ import SwiftUI
 struct ImageCarousel: View {
     let images: [Data]
     @State private var currentIndex: Int = 0
+    @State private var scrollPosition: Int? = 0
     var maxHeight: CGFloat = 200
     var cornerRadius: CGFloat = BudsRadius.small
     var onTap: (() -> Void)? = nil
 
     var body: some View {
-        if images.isEmpty {
-            EmptyView()
-        } else if images.count == 1 {
-            // Single image - no carousel needed
-            singleImage(images[0])
-        } else {
-            // Multiple images - show carousel
-            VStack(spacing: 8) {
-                TabView(selection: $currentIndex) {
-                    ForEach(Array(images.enumerated()), id: \.offset) { index, imageData in
-                        carouselImage(imageData)
-                            .tag(index)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(maxHeight: maxHeight)
+        let _ = print("🎠 ImageCarousel: Rendering with \(images.count) images")
 
-                // Page indicator dots
-                pageIndicator
-            }
+        if images.isEmpty {
+            let _ = print("🎠 ImageCarousel: No images, rendering EmptyView")
+            return AnyView(EmptyView())
+        } else if images.count == 1 {
+            let _ = print("🎠 ImageCarousel: Single image, size: \(images[0].count) bytes")
+            // Single image - no carousel needed
+            return AnyView(singleImage(images[0]))
+        } else {
+            let _ = print("🎠 ImageCarousel: Multiple images carousel")
+            // Multiple images - show carousel with ScrollView instead of TabView
+            return AnyView(
+                VStack(spacing: 8) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 0) {
+                            ForEach(Array(images.enumerated()), id: \.offset) { index, imageData in
+                                GeometryReader { geometry in
+                                    carouselImage(imageData)
+                                        .frame(width: geometry.size.width)
+                                        .id(index)
+                                }
+                                .containerRelativeFrame(.horizontal)
+                            }
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .scrollPosition(id: $scrollPosition)
+                    .scrollTargetBehavior(.paging)
+                    .frame(height: maxHeight)
+                    .onChange(of: scrollPosition) { _, newValue in
+                        if let index = newValue {
+                            currentIndex = index
+                            print("🎠 ImageCarousel: Scrolled to index \(index)")
+                        }
+                    }
+
+                    // Page indicator dots
+                    pageIndicator
+                }
+            )
         }
     }
 
     // MARK: - Single Image
 
     private func singleImage(_ imageData: Data) -> some View {
-        Group {
-            if let uiImage = UIImage(data: imageData) {
+        if let uiImage = UIImage(data: imageData) {
+            let _ = print("🎠 ImageCarousel: Successfully created UIImage, size: \(uiImage.size)")
+            return AnyView(
                 Image(uiImage: uiImage)
                     .resizable()
-                    .scaledToFill()
-                    .frame(maxHeight: maxHeight)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: maxHeight)
                     .clipped()
                     .cornerRadius(cornerRadius)
                     .onTapGesture {
                         onTap?()
                     }
-            }
+            )
+        } else {
+            let _ = print("❌ ImageCarousel: Failed to create UIImage from \(imageData.count) bytes")
+            return AnyView(
+                Text("Failed to load image")
+                    .foregroundColor(.red)
+                    .frame(height: maxHeight)
+            )
         }
     }
 
     // MARK: - Carousel Image
 
     private func carouselImage(_ imageData: Data) -> some View {
-        Group {
-            if let uiImage = UIImage(data: imageData) {
+        if let uiImage = UIImage(data: imageData) {
+            let _ = print("🎠 ImageCarousel: Successfully created UIImage, size: \(uiImage.size)")
+            return AnyView(
                 Image(uiImage: uiImage)
                     .resizable()
-                    .scaledToFill()
-                    .frame(maxHeight: maxHeight)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: maxHeight)
                     .clipped()
                     .cornerRadius(cornerRadius)
                     .onTapGesture {
                         onTap?()
                     }
-            }
+            )
+        } else {
+            let _ = print("❌ ImageCarousel: Failed to create UIImage from \(imageData.count) bytes")
+            return AnyView(
+                VStack {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.largeTitle)
+                        .foregroundColor(.red)
+                    Text("Failed to load")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+                .frame(height: maxHeight)
+            )
         }
     }
 

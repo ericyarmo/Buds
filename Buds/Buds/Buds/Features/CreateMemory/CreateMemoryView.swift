@@ -217,6 +217,11 @@ final class CreateMemoryViewModel: ObservableObject {
 
     func save() async {
         do {
+            print("💾 CreateMemory: Saving memory with \(selectedImages.count) images")
+            for (index, imageData) in selectedImages.enumerated() {
+                print("💾 CreateMemory: Image \(index + 1) size: \(imageData.count) bytes")
+            }
+
             let memory = try await repository.create(
                 strainName: strainName,
                 productType: productType,
@@ -230,9 +235,13 @@ final class CreateMemoryViewModel: ObservableObject {
                 consumptionMethod: consumptionMethod
             )
 
+            print("💾 CreateMemory: Memory created with ID: \(memory.id)")
+
             // Add images if any were selected
             if !selectedImages.isEmpty {
+                print("💾 CreateMemory: Adding \(selectedImages.count) images to memory")
                 try await repository.addImages(to: memory.id, images: selectedImages)
+                print("💾 CreateMemory: Images added successfully")
             }
 
             print("✅ Memory created successfully with \(selectedImages.count) images")
