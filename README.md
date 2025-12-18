@@ -8,10 +8,11 @@ Built on ChaingeOS principles: receipts-first, local-first, privacy by default.
 
 ## Project Status
 
-🟢 **In Development** - Foundation wired, building features
+🚀 **LIVE ON TESTFLIGHT** - Phase 3 Complete (December 18, 2025)
 
-**Current Phase:** Phase 0 - Foundation (Database + UI Framework)
-**Estimated Target:** TestFlight v0.1 in 2-4 weeks
+**Current Build:** v1.0 (Build 1) - Approved for external testing (10k users)
+**Bundle ID:** `app.getbuds.buds`
+**Next Up:** Auth + Circle Mechanics (Phase 4)
 
 ---
 
@@ -252,41 +253,54 @@ This is a private project (for now). Architecture by Claude (Anthropic) + Eric. 
 - ✅ **MemoryCard** - Production-ready card component with all fields
 - ✅ **EffectTag** - Color-coded effect chips
 
-### Current Status: 🟢 **v0.1 RUNNING** (Physics-Validated)
+### Phase 3: Image Support + Memory Enhancement ✅
+- ✅ **Multi-Image Support** - Up to 3 photos per memory (camera + library)
+- ✅ **Photo Picker** - Camera flip, multi-select, compression (2MB max)
+- ✅ **Image Carousel** - Swipeable with page indicators
+- ✅ **Photo Management** - Reorder, delete, visual feedback
+- ✅ **Memory Detail View** - Hero images, card layout, better hierarchy
+- ✅ **Timeline Enhancement** - Image previews, gradient headers
+- ✅ **Database Migration v2** - image_cid → image_cids (JSON array)
+- ✅ **Blob Storage** - CID-based image retrieval
+
+**See [PHASE_3_COMPLETE.md](./PHASE_3_COMPLETE.md)** for full Phase 3 details.
+
+### Current Status: 🚀 **LIVE ON TESTFLIGHT** (Dec 18, 2025)
 
 **What's working:**
-- Complete timeline → create memory → sign receipt → store → display flow
-- GRDB database with full schema
-- Receipt signing with Ed25519 (physics-tested)
-- **Production CBOR encoder** (0.11ms p50 latency, ported from BudsKernelGolden)
-- RFC 8949 canonical encoding with deterministic key sorting
-- All UI components styled and functional
+- ✅ Create memory with up to 3 photos
+- ✅ Swipeable image carousel with page indicators
+- ✅ Photo reordering with visual feedback
+- ✅ Full memory timeline with image previews
+- ✅ Receipt signing with Ed25519 (physics-tested)
+- ✅ Production CBOR encoder (0.11ms p50 latency)
+- ✅ All UI components styled and functional
 
-**Physics Test Results** (from BudsKernelGolden):
-- Encode + CID + Sign: **p50=0.11ms, p95=0.13ms**
-- Seal + Wrap + Unwrap + Open: **p50=0.11ms, p95=0.13ms**
-- ✅ All 12 tests passing (E2EE, tamper detection, full pipeline)
+**TestFlight:**
+- Build: v1.0 (Build 1)
+- Status: Approved for external testing
+- Testers: Up to 10,000 external testers
+- Bundle ID: `app.getbuds.buds`
 
-### Next: Create Xcode Project
+### Phase 4: Auth + Circle Mechanics (IN PROGRESS)
 
-**See [SETUP_INSTRUCTIONS.md](./SETUP_INSTRUCTIONS.md)** for step-by-step guide to:
-1. Create Xcode project
-2. Add SPM dependencies (GRDB, Firebase, SwiftCBOR)
-3. Build & run on simulator
-4. Create your first memory!
+**Today (Dec 18):**
+- [ ] User accounts (Firebase Auth)
+- [ ] Profile screen
+- [ ] Identity management with accounts
 
-### Phase 3-7: Remaining Features
-- [ ] Map view + location capture (fuzzy grid privacy)
-- [ ] Circle sharing (E2EE with X25519 + AES-256-GCM)
-- [ ] Relay server (Cloudflare Workers)
+**Tomorrow (Dec 19):**
+- [ ] Circle mechanics (friends)
+- [ ] Share memories with circle
+- [ ] Relay server integration
+- [ ] Map view for location tracking
+
+### Remaining Features
+- [ ] E2EE circle sharing (X25519 + AES-256-GCM)
+- [ ] Cloudflare Workers relay
 - [ ] Agent integration (DeepSeek/Qwen)
-- [ ] TestFlight build
+- [ ] Map view + fuzzy location privacy
 
-**Current file count:** 21 Swift files + 11 docs = Production-ready v0.1 foundation
+**Current file count:** 26 Swift files + 8 essential docs = Production app
 
-**Latest additions:**
-- CBORValue.swift - CBOR value types
-- CBORCanonical.swift - RFC 8949 encoder (ported from BudsKernelGolden)
-- ReceiptCanonicalizer.swift - Receipt serialization
-
-**Let's ship! 🚀🌿**
+**December 18, 2025 is a good day. Memory creation fully works. 🚀🌿**
