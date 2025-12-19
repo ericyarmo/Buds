@@ -6,4 +6,7 @@ build/
 *.xcodeproj/project.xcworkspace/
 *.xcodeproj/xcuserdata/
 Package.resolved
+
+# Firebase configuration (contains API keys)
 GoogleService-Info.plist
+**/GoogleService-Info*.plist
