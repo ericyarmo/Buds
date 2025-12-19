@@ -8,11 +8,12 @@ Built on ChaingeOS principles: receipts-first, local-first, privacy by default.
 
 ## Project Status
 
-🚀 **LIVE ON TESTFLIGHT** - Phase 3 Complete (December 18, 2025)
+🚀 **LIVE ON TESTFLIGHT** - Phase 4 Complete (December 19, 2025)
 
 **Current Build:** v1.0 (Build 1) - Approved for external testing (10k users)
 **Bundle ID:** `app.getbuds.buds`
-**Next Up:** Auth + Circle Mechanics (Phase 4)
+**Latest:** Firebase Auth + Profile working
+**Next Up:** Circle Mechanics (Phase 5) - See [PHASE_5_PLAN.md](./PHASE_5_PLAN.md)
 
 ---
 
@@ -282,25 +283,43 @@ This is a private project (for now). Architecture by Claude (Anthropic) + Eric. 
 - Testers: Up to 10,000 external testers
 - Bundle ID: `app.getbuds.buds`
 
-### Phase 4: Auth + Circle Mechanics (IN PROGRESS)
+### Phase 4: Firebase Auth + Profile ✅ (COMPLETE - Dec 19, 2025)
+- ✅ Firebase Phone Authentication (SMS verification)
+- ✅ APNs integration for silent push
+- ✅ AuthManager with phone verification flow
+- ✅ ProfileView with editable display name
+- ✅ Identity section (DID + Firebase UID)
+- ✅ Storage info + account settings
+- ✅ Sign out / delete account
+- ✅ Privacy-first: phone numbers only in Firebase Auth layer
 
-**Today (Dec 18):**
-- [ ] User accounts (Firebase Auth)
-- [ ] Profile screen
-- [ ] Identity management with accounts
+**See [`PHASE_4_COMPLETE.md`](./PHASE_4_COMPLETE.md) for full details.**
 
-**Tomorrow (Dec 19):**
-- [ ] Circle mechanics (friends)
-- [ ] Share memories with circle
-- [ ] Relay server integration
-- [ ] Map view for location tracking
+### Phase 5: Circle Mechanics (NEXT UP)
 
-### Remaining Features
-- [ ] E2EE circle sharing (X25519 + AES-256-GCM)
-- [ ] Cloudflare Workers relay
-- [ ] Agent integration (DeepSeek/Qwen)
-- [ ] Map view + fuzzy location privacy
+**Focus:** Add friends, local Circle management, UI foundation
 
-**Current file count:** 26 Swift files + 8 essential docs = Production app
+**Tasks:**
+- [ ] Database migration v3 (circles + devices tables)
+- [ ] CircleMember + Device models
+- [ ] CircleManager for CRUD operations
+- [ ] CircleView UI (list, add, remove members)
+- [ ] Member detail view
+- [ ] Max 12 member limit enforcement
 
-**December 18, 2025 is a good day. Memory creation fully works. 🚀🌿**
+**See [`PHASE_5_PLAN.md`](./PHASE_5_PLAN.md) for implementation guide.**
+
+### Phase 6: E2EE Sharing + Relay (PLANNED)
+- [ ] Relay server integration (DID lookup)
+- [ ] E2EE encryption (X25519 + AES-256-GCM)
+- [ ] Share memories with Circle
+- [ ] Message delivery via Cloudflare Workers
+
+### Future Phases
+- [ ] Map view + fuzzy location privacy (Phase 7)
+- [ ] Agent integration - DeepSeek/Qwen (Phase 8)
+- [ ] Polish + TestFlight v2 (Phase 9)
+
+**Current file count:** 29 Swift files + PHASE_5_PLAN.md = Ready for Circle mechanics
+
+**December 19, 2025: Phase 4 complete! Firebase Auth + Profile working perfectly. 🎉🌿**
