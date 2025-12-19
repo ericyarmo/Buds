@@ -32,8 +32,7 @@ struct MainTabView: View {
                 }
                 .tag(2)
 
-            Text("Profile (Coming Soon)")
-                .font(.budsHeadline)
+            ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }

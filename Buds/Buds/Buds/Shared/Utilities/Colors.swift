@@ -15,6 +15,7 @@ extension Color {
 
     // MARK: - Backgrounds
     static let budsBackground = Color(hex: "#F5F5F5")   // Light gray
+    static let budsCard = Color(hex: "#FFFFFF")         // White card
     // Note: budsSurface defined in Assets.xcassets
     static let budsSurfaceDark = Color(hex: "#1E1E1E")
 
@@ -22,7 +23,11 @@ extension Color {
     // Note: budsSuccess defined in Assets.xcassets
     static let budsWarning = Color(hex: "#FFC107")
     static let budsError = Color(hex: "#F44336")
+    static let budsDanger = Color(hex: "#F44336")       // Red (same as error)
     static let budsInfo = Color(hex: "#2196F3")
+
+    // MARK: - Text Colors (note: budsTextPrimary and budsTextSecondary defined in Assets.xcassets)
+    static let budsText = Color.budsTextPrimary         // Alias for budsTextPrimary
 
     // MARK: - Effect Tags
 
