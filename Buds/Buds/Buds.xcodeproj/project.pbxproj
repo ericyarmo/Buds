@@ -34,6 +34,16 @@
 		58FFD9782EF345DB00C0A7DB /* PhotoPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9772EF345DB00C0A7DB /* PhotoPicker.swift */; };
 		58FFD97C2EF3462500C0A7DB /* MemoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD97B2EF3462500C0A7DB /* MemoryDetailView.swift */; };
 		58FFD9822EF3470A00C0A7DB /* ImageCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9812EF3470A00C0A7DB /* ImageCarousel.swift */; };
+		58FFD9892EF4BB2800C0A7DB /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9882EF4BB2800C0A7DB /* AuthManager.swift */; };
+		58FFD98C2EF4BBA300C0A7DB /* PhoneAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD98A2EF4BBA300C0A7DB /* PhoneAuthView.swift */; };
+		58FFD98F2EF4BBB600C0A7DB /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD98D2EF4BBB600C0A7DB /* ProfileView.swift */; };
+		58FFD9912EF5C80500C0A7DB /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD9902EF5C80500C0A7DB /* GoogleService-Info.plist */; };
+		58FFD9942EF71BFE00C0A7DB /* CircleMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9922EF71BFE00C0A7DB /* CircleMember.swift */; };
+		58FFD9952EF71BFE00C0A7DB /* Device.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9932EF71BFE00C0A7DB /* Device.swift */; };
+		58FFD9972EF71C1100C0A7DB /* CircleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9962EF71C1100C0A7DB /* CircleManager.swift */; };
+		58FFD99C2EF71C2900C0A7DB /* MemberDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */; };
+		58FFD99D2EF71C2900C0A7DB /* CircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9992EF71C2900C0A7DB /* CircleView.swift */; };
+		58FFD99E2EF71C2900C0A7DB /* AddMemberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,10 +88,20 @@
 		58FFD9452EF2900D00C0A7DB /* EffectTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EffectTag.swift; sourceTree = "<group>"; };
 		58FFD9462EF2900D00C0A7DB /* MemoryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCard.swift; sourceTree = "<group>"; };
 		58FFD9492EF2900D00C0A7DB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		58FFD9682EF32D5200C0A7DB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		58FFD9772EF345DB00C0A7DB /* PhotoPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPicker.swift; sourceTree = "<group>"; };
 		58FFD97B2EF3462500C0A7DB /* MemoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryDetailView.swift; sourceTree = "<group>"; };
 		58FFD9812EF3470A00C0A7DB /* ImageCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCarousel.swift; sourceTree = "<group>"; };
+		58FFD9852EF4A19C00C0A7DB /* Buds.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Buds.entitlements; sourceTree = "<group>"; };
+		58FFD9882EF4BB2800C0A7DB /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		58FFD98A2EF4BBA300C0A7DB /* PhoneAuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneAuthView.swift; sourceTree = "<group>"; };
+		58FFD98D2EF4BBB600C0A7DB /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		58FFD9902EF5C80500C0A7DB /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		58FFD9922EF71BFE00C0A7DB /* CircleMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleMember.swift; sourceTree = "<group>"; };
+		58FFD9932EF71BFE00C0A7DB /* Device.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Device.swift; sourceTree = "<group>"; };
+		58FFD9962EF71C1100C0A7DB /* CircleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleManager.swift; sourceTree = "<group>"; };
+		58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMemberView.swift; sourceTree = "<group>"; };
+		58FFD9992EF71C2900C0A7DB /* CircleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleView.swift; sourceTree = "<group>"; };
+		58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -186,6 +206,8 @@
 		58FFD9372EF2900D00C0A7DB /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9922EF71BFE00C0A7DB /* CircleMember.swift */,
+				58FFD9932EF71BFE00C0A7DB /* Device.swift */,
 				58FFD9352EF2900D00C0A7DB /* Memory.swift */,
 				58FFD9362EF2900D00C0A7DB /* UCRHeader.swift */,
 			);
@@ -195,6 +217,8 @@
 		58FFD9382EF2900D00C0A7DB /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9962EF71C1100C0A7DB /* CircleManager.swift */,
+				58FFD9882EF4BB2800C0A7DB /* AuthManager.swift */,
 				58FFD9302EF2900D00C0A7DB /* ChaingeKernel */,
 				58FFD9342EF2900D00C0A7DB /* Database */,
 				58FFD9372EF2900D00C0A7DB /* Models */,
@@ -223,6 +247,9 @@
 		58FFD93E2EF2900D00C0A7DB /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD99B2EF71C2900C0A7DB /* Circle */,
+				58FFD98E2EF4BBB600C0A7DB /* Profile */,
+				58FFD98B2EF4BBA300C0A7DB /* Auth */,
 				58FFD93A2EF2900D00C0A7DB /* CreateMemory */,
 				58FFD93C2EF2900D00C0A7DB /* Timeline */,
 				58FFD93D2EF2900D00C0A7DB /* MainTabView.swift */,
@@ -270,15 +297,42 @@
 		58FFD94A2EF2900D00C0A7DB /* Buds */ = {
 			isa = PBXGroup;
 			children = (
-				58FFD9682EF32D5200C0A7DB /* Info.plist */,
+				58FFD9852EF4A19C00C0A7DB /* Buds.entitlements */,
 				58FFD9292EF2900D00C0A7DB /* App */,
 				58FFD9382EF2900D00C0A7DB /* Core */,
 				58FFD93E2EF2900D00C0A7DB /* Features */,
 				58FFD9402EF2900D00C0A7DB /* Resources */,
 				58FFD9482EF2900D00C0A7DB /* Shared */,
 				58FFD9492EF2900D00C0A7DB /* Assets.xcassets */,
+				58FFD9902EF5C80500C0A7DB /* GoogleService-Info.plist */,
 			);
 			path = Buds;
+			sourceTree = "<group>";
+		};
+		58FFD98B2EF4BBA300C0A7DB /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				58FFD98A2EF4BBA300C0A7DB /* PhoneAuthView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		58FFD98E2EF4BBB600C0A7DB /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				58FFD98D2EF4BBB600C0A7DB /* ProfileView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		58FFD99B2EF71C2900C0A7DB /* Circle */ = {
+			isa = PBXGroup;
+			children = (
+				58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */,
+				58FFD9992EF71C2900C0A7DB /* CircleView.swift */,
+				58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */,
+			);
+			path = Circle;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -406,6 +460,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				58FFD94B2EF2900D00C0A7DB /* Info-Template.plist in Resources */,
+				58FFD9912EF5C80500C0A7DB /* GoogleService-Info.plist in Resources */,
 				58FFD94C2EF2900D00C0A7DB /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -432,10 +487,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */,
+				58FFD9892EF4BB2800C0A7DB /* AuthManager.swift in Sources */,
+				58FFD9942EF71BFE00C0A7DB /* CircleMember.swift in Sources */,
+				58FFD9952EF71BFE00C0A7DB /* Device.swift in Sources */,
 				58FFD94E2EF2900D00C0A7DB /* CBORCanonical.swift in Sources */,
 				58FFD94F2EF2900D00C0A7DB /* CBOREncoder.swift in Sources */,
 				58FFD9502EF2900D00C0A7DB /* CBORValue.swift in Sources */,
+				58FFD98C2EF4BBA300C0A7DB /* PhoneAuthView.swift in Sources */,
 				58FFD9512EF2900D00C0A7DB /* IdentityManager.swift in Sources */,
+				58FFD98F2EF4BBB600C0A7DB /* ProfileView.swift in Sources */,
 				58FFD9522EF2900D00C0A7DB /* ReceiptCanonicalizer.swift in Sources */,
 				58FFD9532EF2900D00C0A7DB /* ReceiptManager.swift in Sources */,
 				58FFD9542EF2900D00C0A7DB /* MemoryRepository.swift in Sources */,
@@ -449,10 +509,14 @@
 				58FFD97C2EF3462500C0A7DB /* MemoryDetailView.swift in Sources */,
 				58FFD95B2EF2900D00C0A7DB /* Colors.swift in Sources */,
 				58FFD95C2EF2900D00C0A7DB /* Spacing.swift in Sources */,
+				58FFD99C2EF71C2900C0A7DB /* MemberDetailView.swift in Sources */,
+				58FFD99D2EF71C2900C0A7DB /* CircleView.swift in Sources */,
+				58FFD99E2EF71C2900C0A7DB /* AddMemberView.swift in Sources */,
 				58FFD95D2EF2900D00C0A7DB /* Typography.swift in Sources */,
 				58FFD9822EF3470A00C0A7DB /* ImageCarousel.swift in Sources */,
 				58FFD95E2EF2900D00C0A7DB /* EffectTag.swift in Sources */,
 				58FFD95F2EF2900D00C0A7DB /* MemoryCard.swift in Sources */,
+				58FFD9972EF71C1100C0A7DB /* CircleManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -612,6 +676,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Buds/Buds.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = UVF3TRAKZM;
@@ -653,6 +718,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Buds/Buds.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = UVF3TRAKZM;

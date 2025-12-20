@@ -25,8 +25,7 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
-            Text("Circle (Coming Soon)")
-                .font(.budsHeadline)
+            CircleView()
                 .tabItem {
                     Label("Circle", systemImage: "person.2.fill")
                 }

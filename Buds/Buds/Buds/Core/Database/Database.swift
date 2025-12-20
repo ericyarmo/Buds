@@ -59,6 +59,11 @@ final class Database {
             try migrateToMultipleImages(db)
         }
 
+        // Migration v3: Circle mechanics
+        migrator.registerMigration("v3_circles") { db in
+            try migrateToCircles(db)
+        }
+
         return migrator
     }
 
@@ -256,4 +261,62 @@ private func migrateToMultipleImages(_ db: GRDB.Database) throws {
     """)
 
     print("✅ Database migrated to v2 (multiple images support)")
+}
+
+// MARK: - Migration v3
+
+private func migrateToCircles(_ db: GRDB.Database) throws {
+    print("📦 Running migration v3: Circle tables")
+
+    // Create circles table
+    try db.execute(sql: """
+        CREATE TABLE circles (
+            id TEXT PRIMARY KEY NOT NULL,
+            did TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            phone_number TEXT,
+            avatar_cid TEXT,
+            pubkey_x25519 TEXT NOT NULL,
+            status TEXT NOT NULL,
+            joined_at REAL,
+            invited_at REAL,
+            removed_at REAL,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        )
+    """)
+
+    // Create indexes for circles
+    try db.execute(sql: """
+        CREATE INDEX idx_circles_did ON circles(did)
+    """)
+    try db.execute(sql: """
+        CREATE INDEX idx_circles_status ON circles(status)
+    """)
+
+    // Update devices table to match new schema
+    // Drop and recreate with updated schema
+    try db.execute(sql: "DROP TABLE IF EXISTS devices")
+
+    try db.execute(sql: """
+        CREATE TABLE devices (
+            device_id TEXT PRIMARY KEY NOT NULL,
+            owner_did TEXT NOT NULL,
+            device_name TEXT NOT NULL,
+            pubkey_x25519 TEXT NOT NULL,
+            pubkey_ed25519 TEXT NOT NULL,
+            status TEXT NOT NULL,
+            registered_at REAL NOT NULL,
+            last_seen_at REAL
+        )
+    """)
+
+    try db.execute(sql: """
+        CREATE INDEX idx_devices_owner ON devices(owner_did)
+    """)
+    try db.execute(sql: """
+        CREATE INDEX idx_devices_status ON devices(status)
+    """)
+
+    print("✅ Migration v3 complete: Circle tables created")
 }

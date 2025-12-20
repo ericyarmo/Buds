@@ -14,7 +14,7 @@ struct TimelineView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.budsBackground.ignoresSafeArea()
+                Color.black.ignoresSafeArea()
 
                 if viewModel.isLoading {
                     ProgressView("Loading memories...")

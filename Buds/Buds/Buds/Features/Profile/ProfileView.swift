@@ -45,7 +45,7 @@ struct ProfileView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
             }
-            .background(Color.budsBackground)
+            .background(Color.black)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
             .task {
