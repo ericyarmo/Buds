@@ -1,9 +1,9 @@
-# Phase 6: E2EE Sharing + Relay Integration
+# Phase 6: E2EE Sharing + Cloudflare Relay
 
 **Last Updated:** December 20, 2025
 **Prerequisites:** Phase 5 complete (Circle mechanics working)
-**Estimated Time:** 8-12 hours
-**Goal:** Enable users to share memories with Circle using E2EE, device registration, and Firebase-based relay
+**Estimated Time:** 10-14 hours
+**Goal:** Enable users to share memories with Circle using E2EE, device registration, and Cloudflare Workers relay
 
 ---
 
@@ -14,30 +14,32 @@
 1. Read this file completely (45 min)
 2. Review `/docs/E2EE_DESIGN.md` for encryption details (30 min)
 3. Review Phase 5 completion in `README.md` (10 min)
-4. Follow the implementation steps below sequentially
-5. Test at each checkpoint before proceeding
+4. Set up Cloudflare Workers project (30 min)
+5. Follow the implementation steps below sequentially
+6. Test at each checkpoint before proceeding
 
 **Current State:**
-- ✅ Firebase Auth working (phone verification)
+- ✅ Firebase Auth working (phone verification ONLY)
 - ✅ Profile view with DID display
 - ✅ Memory creation with photos
 - ✅ Timeline view
 - ✅ Circle mechanics (add/remove/edit members)
 - ⏳ E2EE sharing (this phase)
 - ⏳ Device registration (this phase)
-- ⏳ Message relay via Firebase (this phase)
+- ⏳ Cloudflare Workers relay (this phase)
 
 ---
 
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Firebase Setup](#firebase-setup)
-3. [Core Components](#core-components)
-4. [E2EE Implementation](#e2ee-implementation)
-5. [UI Updates](#ui-updates)
-6. [Testing Checkpoints](#testing-checkpoints)
-7. [Troubleshooting](#troubleshooting)
+2. [Cloudflare Setup](#cloudflare-setup)
+3. [Workers API Implementation](#workers-api-implementation)
+4. [Core Swift Components](#core-swift-components)
+5. [E2EE Implementation](#e2ee-implementation)
+6. [UI Updates](#ui-updates)
+7. [Testing Checkpoints](#testing-checkpoints)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -51,18 +53,18 @@
 - No relay server
 
 **Phase 6 (E2EE Sharing):**
-- Device registration on first launch (send device pubkeys to Firebase)
-- Phone → DID lookup via Firebase Functions
+- Device registration on first launch (send device pubkeys to Cloudflare Workers)
+- Phone → DID lookup via Workers API
 - Share memories → Encrypt with recipient device pubkeys
-- Firebase Cloud Messaging (FCM) for delivery notifications
-- Recipients decrypt messages locally
+- Cloudflare Workers as untrusted relay (sees only ciphertext)
+- Recipients poll for messages and decrypt locally
 
 ### E2EE Flow (Simplified)
 
 ```
 1. Alice shares memory with Bob
    ↓
-2. Look up Bob's devices from Firebase Firestore
+2. Look up Bob's devices from Cloudflare D1
    ↓
 3. Generate ephemeral AES-256 key
    ↓
@@ -70,229 +72,848 @@
    ↓
 5. Wrap AES key for each of Bob's devices (X25519 key agreement)
    ↓
-6. Store encrypted message in Firestore
+6. POST encrypted message to Cloudflare Workers
    ↓
-7. Send FCM push to Bob's devices
+7. Workers store in D1, return success
    ↓
-8. Bob's device downloads message, unwraps AES key, decrypts
+8. Bob's device polls /messages/inbox, downloads message
    ↓
-9. Store decrypted receipt in local DB
+9. Bob unwraps AES key, decrypts, verifies signature
+   ↓
+10. Store decrypted receipt in local DB
 ```
 
 ### Key Architectural Decisions
 
-1. **Firebase as Relay**: Use Firestore for message storage, Cloud Functions for DID lookup, FCM for push
-2. **No Cloudflare Workers Yet**: Defer custom relay server to Phase 7+ (Firebase is faster to implement)
-3. **Device-Based Encryption**: Each device gets unique X25519 keypair (multi-device support)
-4. **Ephemeral AES Keys**: Each message uses new AES-256 key (wrapped per device)
-5. **Raw CBOR Encryption**: Encrypt canonical CBOR bytes (not JSON) to preserve signature verification
+1. **Cloudflare Workers as Relay**: Zero-trust relay server (edge compute, sees only ciphertext)
+2. **Cloudflare D1 Storage**: SQLite at the edge for device registry and message queue
+3. **Firebase Auth Only**: Phone verification ONLY - no Firestore, no Cloud Functions
+4. **Device-Based Encryption**: Each device gets unique X25519 keypair (multi-device support)
+5. **Ephemeral AES Keys**: Each message uses new AES-256 key (wrapped per device)
+6. **Raw CBOR Encryption**: Encrypt canonical CBOR bytes (not JSON) to preserve signature verification
+7. **HTTP Polling**: Phase 6 uses polling (Phase 7+ will add push notifications)
+
+### Infrastructure Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| Auth | Firebase Auth | Phone verification only |
+| Relay API | Cloudflare Workers | E2EE message routing |
+| Storage | Cloudflare D1 (SQLite) | Device registry, message queue |
+| Client | Swift + CryptoKit | Encryption, local storage |
 
 ---
 
-## Firebase Setup
+## Cloudflare Setup
 
-### Firestore Collections
+### Step 1: Create Cloudflare Workers Project
 
-**1. `devices` Collection**
+```bash
+# Create new project directory
+mkdir buds-relay
+cd buds-relay
 
-Stores public keys for all registered devices.
+# Initialize Workers project
+npm create cloudflare@latest
 
-```
-devices/{deviceId}
-  - owner_did: string (e.g., "did:buds:abc123")
-  - owner_phone: string (hashed or encrypted, for phone → DID lookup)
-  - device_name: string (e.g., "iPhone 15 Pro")
-  - pubkey_x25519: string (base64)
-  - pubkey_ed25519: string (base64)
-  - status: string ("active" | "revoked")
-  - registered_at: timestamp
-  - last_seen_at: timestamp
-```
-
-**2. `encrypted_messages` Collection**
-
-Stores encrypted messages for delivery.
-
-```
-encrypted_messages/{messageId}
-  - receipt_cid: string
-  - sender_did: string
-  - sender_device_id: string
-  - recipient_dids: array<string>
-  - encrypted_payload: string (base64 combined: nonce || ciphertext || tag)
-  - wrapped_keys: map<deviceId, base64_wrapped_key>
-  - created_at: timestamp
-  - expires_at: timestamp (TTL: 30 days)
+# Project name: buds-relay
+# Type: "Hello World" Worker
+# TypeScript: Yes
+# Git: Yes
+# Deploy: No (we'll test locally first)
 ```
 
-**3. `phone_to_did` Collection**
+### Step 2: Install D1 CLI
 
-Maps phone numbers to DIDs (for Circle invite flow).
-
-```
-phone_to_did/{hashedPhone}
-  - did: string
-  - updated_at: timestamp
+```bash
+# Already installed with Wrangler (Cloudflare CLI)
+npx wrangler --version
 ```
 
-**Note:** Hash phone numbers with SHA-256 for privacy (not plaintext).
+### Step 3: Create D1 Database
 
-### Cloud Functions
+```bash
+# Create production database
+npx wrangler d1 create buds-relay-db
 
-**Function 1: `registerDevice`**
+# Output will show:
+# Database created: buds-relay-db
+# UUID: xxxx-xxxx-xxxx-xxxx
 
-Called when user signs in or adds new device.
+# Add to wrangler.toml:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "buds-relay-db"
+# database_id = "xxxx-xxxx-xxxx-xxxx"
+```
+
+### Step 4: Initialize D1 Schema
+
+Create `schema.sql`:
+
+```sql
+-- Devices table
+CREATE TABLE devices (
+    device_id TEXT PRIMARY KEY NOT NULL,
+    owner_did TEXT NOT NULL,
+    owner_phone_hash TEXT NOT NULL,
+    device_name TEXT NOT NULL,
+    pubkey_x25519 TEXT NOT NULL,
+    pubkey_ed25519 TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    registered_at INTEGER NOT NULL,
+    last_seen_at INTEGER
+);
+
+CREATE INDEX idx_devices_owner_did ON devices(owner_did);
+CREATE INDEX idx_devices_phone_hash ON devices(owner_phone_hash);
+CREATE INDEX idx_devices_status ON devices(status);
+
+-- Encrypted messages table
+CREATE TABLE encrypted_messages (
+    message_id TEXT PRIMARY KEY NOT NULL,
+    receipt_cid TEXT NOT NULL,
+    sender_did TEXT NOT NULL,
+    sender_device_id TEXT NOT NULL,
+    recipient_dids TEXT NOT NULL,
+    encrypted_payload TEXT NOT NULL,
+    wrapped_keys TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_messages_recipient ON encrypted_messages(recipient_dids);
+CREATE INDEX idx_messages_expires ON encrypted_messages(expires_at);
+
+-- Phone to DID mapping
+CREATE TABLE phone_to_did (
+    phone_hash TEXT PRIMARY KEY NOT NULL,
+    did TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+-- Message delivery tracking (for inbox polling)
+CREATE TABLE message_delivery (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id TEXT NOT NULL,
+    recipient_did TEXT NOT NULL,
+    delivered_at INTEGER,
+    FOREIGN KEY (message_id) REFERENCES encrypted_messages(message_id)
+);
+
+CREATE INDEX idx_delivery_recipient ON message_delivery(recipient_did);
+CREATE INDEX idx_delivery_status ON message_delivery(delivered_at);
+```
+
+Apply schema:
+
+```bash
+# Local development
+npx wrangler d1 execute buds-relay-db --local --file=schema.sql
+
+# Production
+npx wrangler d1 execute buds-relay-db --remote --file=schema.sql
+```
+
+### Step 5: Configure wrangler.toml
+
+```toml
+name = "buds-relay"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "buds-relay"
+routes = [
+  { pattern = "api.getbuds.app/*", zone_name = "getbuds.app" }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "buds-relay-db"
+database_id = "YOUR_DATABASE_ID_HERE"
+
+[vars]
+ENVIRONMENT = "production"
+```
+
+---
+
+## Workers API Implementation
+
+### Project Structure
+
+```
+buds-relay/
+├── src/
+│   ├── index.ts           # Main router
+│   ├── handlers/
+│   │   ├── devices.ts     # Device registration
+│   │   ├── lookup.ts      # DID lookup
+│   │   ├── messages.ts    # Message send/receive
+│   └── utils/
+│       ├── auth.ts        # Firebase Auth verification
+│       ├── crypto.ts      # Hashing utilities
+│       └── db.ts          # Database helpers
+├── schema.sql
+├── package.json
+├── tsconfig.json
+└── wrangler.toml
+```
+
+### src/index.ts
+
+Main router for all API endpoints.
 
 ```typescript
-export const registerDevice = functions.https.onCall(async (data, context) => {
-  // Verify user is authenticated
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in');
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { registerDevice, getDevices } from './handlers/devices';
+import { lookupDID } from './handlers/lookup';
+import { sendMessage, getInbox } from './handlers/messages';
 
-  const { deviceId, deviceName, pubkeyX25519, pubkeyEd25519, ownerDID } = data;
+type Bindings = {
+  DB: D1Database;
+};
 
-  // Store device in Firestore
-  await admin.firestore().collection('devices').doc(deviceId).set({
-    owner_did: ownerDID,
-    owner_phone: context.auth.token.phone_number,  // From Firebase Auth
-    device_name: deviceName,
-    pubkey_x25519: pubkeyX25519,
-    pubkey_ed25519: pubkeyEd25519,
-    status: 'active',
-    registered_at: admin.firestore.FieldValue.serverTimestamp(),
-    last_seen_at: admin.firestore.FieldValue.serverTimestamp()
-  });
+const app = new Hono<{ Bindings: Bindings }>();
 
-  // Map phone → DID
-  const phoneHash = crypto.createHash('sha256').update(context.auth.token.phone_number).digest('hex');
-  await admin.firestore().collection('phone_to_did').doc(phoneHash).set({
-    did: ownerDID,
-    updated_at: admin.firestore.FieldValue.serverTimestamp()
-  });
+// CORS configuration
+app.use('/*', cors({
+  origin: '*', // TODO: Restrict to app domains in production
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+}));
 
-  return { success: true };
-});
+// Health check
+app.get('/health', (c) => c.json({ status: 'ok' }));
+
+// Device endpoints
+app.post('/api/devices/register', registerDevice);
+app.post('/api/devices/list', getDevices);
+
+// Lookup endpoints
+app.post('/api/lookup/did', lookupDID);
+
+// Message endpoints
+app.post('/api/messages/send', sendMessage);
+app.get('/api/messages/inbox', getInbox);
+
+export default app;
 ```
 
-**Function 2: `lookupDID`**
+### src/handlers/devices.ts
 
-Look up DID by phone number (for adding Circle members).
+Device registration and discovery.
 
 ```typescript
-export const lookupDID = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in');
+import { Context } from 'hono';
+import { verifyFirebaseToken } from '../utils/auth';
+import { hashPhone } from '../utils/crypto';
 
-  const { phoneNumber } = data;
-  const phoneHash = crypto.createHash('sha256').update(phoneNumber).digest('hex');
+export async function registerDevice(c: Context) {
+  try {
+    // Verify Firebase Auth token
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
 
-  const doc = await admin.firestore().collection('phone_to_did').doc(phoneHash).get();
-  if (!doc.exists) {
-    throw new functions.https.HttpsError('not-found', 'User not found');
+    const token = authHeader.substring(7);
+    const user = await verifyFirebaseToken(token);
+
+    // Parse request body
+    const body = await c.req.json();
+    const { deviceId, deviceName, pubkeyX25519, pubkeyEd25519, ownerDID } = body;
+
+    if (!deviceId || !deviceName || !pubkeyX25519 || !pubkeyEd25519 || !ownerDID) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    // Hash phone number for privacy
+    const phoneHash = hashPhone(user.phoneNumber);
+
+    // Store device in D1
+    const db = c.env.DB;
+    const now = Date.now();
+
+    await db.prepare(`
+      INSERT INTO devices (device_id, owner_did, owner_phone_hash, device_name,
+                          pubkey_x25519, pubkey_ed25519, status, registered_at, last_seen_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
+      ON CONFLICT(device_id) DO UPDATE SET
+        last_seen_at = ?,
+        status = 'active'
+    `).bind(
+      deviceId,
+      ownerDID,
+      phoneHash,
+      deviceName,
+      pubkeyX25519,
+      pubkeyEd25519,
+      now,
+      now,
+      now
+    ).run();
+
+    // Map phone → DID
+    await db.prepare(`
+      INSERT INTO phone_to_did (phone_hash, did, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(phone_hash) DO UPDATE SET
+        did = ?,
+        updated_at = ?
+    `).bind(phoneHash, ownerDID, now, ownerDID, now).run();
+
+    return c.json({ success: true, deviceId });
+  } catch (error) {
+    console.error('Device registration error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
   }
+}
 
-  return { did: doc.data().did };
-});
-```
-
-**Function 3: `getDevices`**
-
-Get all active devices for a list of DIDs.
-
-```typescript
-export const getDevices = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in');
-
-  const { dids } = data;  // array of DIDs
-
-  const devicesSnapshot = await admin.firestore()
-    .collection('devices')
-    .where('owner_did', 'in', dids)
-    .where('status', '==', 'active')
-    .get();
-
-  const devices = devicesSnapshot.docs.map(doc => ({
-    device_id: doc.id,
-    ...doc.data()
-  }));
-
-  return { devices };
-});
-```
-
-**Function 4: `sendMessage`**
-
-Store encrypted message and send FCM push.
-
-```typescript
-export const sendMessage = functions.https.onCall(async (data, context) => {
-  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be signed in');
-
-  const { messageId, receiptCID, encryptedPayload, wrappedKeys, recipientDIDs, senderDID, senderDeviceId } = data;
-
-  // Store encrypted message
-  await admin.firestore().collection('encrypted_messages').doc(messageId).set({
-    receipt_cid: receiptCID,
-    sender_did: senderDID,
-    sender_device_id: senderDeviceId,
-    recipient_dids: recipientDIDs,
-    encrypted_payload: encryptedPayload,
-    wrapped_keys: wrappedKeys,
-    created_at: admin.firestore.FieldValue.serverTimestamp(),
-    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)  // 30 days
-  });
-
-  // Send FCM to recipient devices
-  const deviceTokens = await getDeviceTokensFor(recipientDIDs);
-  if (deviceTokens.length > 0) {
-    await admin.messaging().sendMulticast({
-      tokens: deviceTokens,
-      notification: {
-        title: 'New Memory Shared',
-        body: 'Someone shared a memory with you'
-      },
-      data: {
-        message_id: messageId,
-        receipt_cid: receiptCID
-      }
-    });
-  }
-
-  return { success: true };
-});
-```
-
-### Security Rules
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Devices: anyone authenticated can read, owner can write
-    match /devices/{deviceId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == resource.data.owner_phone;  // Only owner can update
+export async function getDevices(c: Context) {
+  try {
+    // Verify Firebase Auth token
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    // Encrypted messages: recipients can read, sender can write
-    match /encrypted_messages/{messageId} {
-      allow read: if request.auth != null &&
-                    (request.auth.token.phone_number in resource.data.recipient_dids ||
-                     request.auth.uid == resource.data.sender_did);
-      allow create: if request.auth != null;
+    const token = authHeader.substring(7);
+    await verifyFirebaseToken(token);
+
+    // Parse request
+    const body = await c.req.json();
+    const { dids } = body;
+
+    if (!Array.isArray(dids) || dids.length === 0) {
+      return c.json({ error: 'Invalid DIDs array' }, 400);
     }
 
-    // Phone to DID: read-only for authenticated users
-    match /phone_to_did/{phoneHash} {
-      allow read: if request.auth != null;
-    }
+    // Query devices (max 12 DIDs for Circle limit)
+    const db = c.env.DB;
+    const placeholders = dids.map(() => '?').join(',');
+    const query = `
+      SELECT device_id, owner_did, device_name, pubkey_x25519, pubkey_ed25519, status
+      FROM devices
+      WHERE owner_did IN (${placeholders}) AND status = 'active'
+    `;
+
+    const result = await db.prepare(query).bind(...dids).all();
+
+    return c.json({ devices: result.results });
+  } catch (error) {
+    console.error('Get devices error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
   }
 }
 ```
 
+### src/handlers/lookup.ts
+
+Phone number to DID lookup.
+
+```typescript
+import { Context } from 'hono';
+import { verifyFirebaseToken } from '../utils/auth';
+import { hashPhone } from '../utils/crypto';
+
+export async function lookupDID(c: Context) {
+  try {
+    // Verify Firebase Auth token
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const token = authHeader.substring(7);
+    await verifyFirebaseToken(token);
+
+    // Parse request
+    const body = await c.req.json();
+    const { phoneNumber } = body;
+
+    if (!phoneNumber) {
+      return c.json({ error: 'Phone number required' }, 400);
+    }
+
+    // Hash phone for lookup
+    const phoneHash = hashPhone(phoneNumber);
+
+    // Query D1
+    const db = c.env.DB;
+    const result = await db.prepare(`
+      SELECT did FROM phone_to_did WHERE phone_hash = ?
+    `).bind(phoneHash).first();
+
+    if (!result) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    return c.json({ did: result.did });
+  } catch (error) {
+    console.error('DID lookup error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+```
+
+### src/handlers/messages.ts
+
+Message send and inbox retrieval.
+
+```typescript
+import { Context } from 'hono';
+import { verifyFirebaseToken } from '../utils/auth';
+
+export async function sendMessage(c: Context) {
+  try {
+    // Verify Firebase Auth token
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const token = authHeader.substring(7);
+    await verifyFirebaseToken(token);
+
+    // Parse request
+    const body = await c.req.json();
+    const {
+      messageId,
+      receiptCID,
+      encryptedPayload,
+      wrappedKeys,
+      recipientDIDs,
+      senderDID,
+      senderDeviceId
+    } = body;
+
+    if (!messageId || !receiptCID || !encryptedPayload || !wrappedKeys || !recipientDIDs || !senderDID || !senderDeviceId) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    const db = c.env.DB;
+    const now = Date.now();
+    const expiresAt = now + (30 * 24 * 60 * 60 * 1000); // 30 days
+
+    // Store encrypted message
+    await db.prepare(`
+      INSERT INTO encrypted_messages
+      (message_id, receipt_cid, sender_did, sender_device_id, recipient_dids,
+       encrypted_payload, wrapped_keys, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      messageId,
+      receiptCID,
+      senderDID,
+      senderDeviceId,
+      JSON.stringify(recipientDIDs),
+      encryptedPayload,
+      JSON.stringify(wrappedKeys),
+      now,
+      expiresAt
+    ).run();
+
+    // Create delivery records for each recipient
+    for (const recipientDID of recipientDIDs) {
+      await db.prepare(`
+        INSERT INTO message_delivery (message_id, recipient_did, delivered_at)
+        VALUES (?, ?, NULL)
+      `).bind(messageId, recipientDID).run();
+    }
+
+    return c.json({ success: true, messageId });
+  } catch (error) {
+    console.error('Send message error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+
+export async function getInbox(c: Context) {
+  try {
+    // Verify Firebase Auth token
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const token = authHeader.substring(7);
+    const user = await verifyFirebaseToken(token);
+
+    // Get DID from query params
+    const did = c.req.query('did');
+    if (!did) {
+      return c.json({ error: 'DID required' }, 400);
+    }
+
+    const db = c.env.DB;
+
+    // Get undelivered messages for this DID
+    const result = await db.prepare(`
+      SELECT m.message_id, m.receipt_cid, m.sender_did, m.sender_device_id,
+             m.encrypted_payload, m.wrapped_keys, m.created_at
+      FROM encrypted_messages m
+      INNER JOIN message_delivery d ON m.message_id = d.message_id
+      WHERE d.recipient_did = ? AND d.delivered_at IS NULL
+      ORDER BY m.created_at DESC
+      LIMIT 50
+    `).bind(did).all();
+
+    // Mark as delivered
+    const messageIds = result.results.map((m: any) => m.message_id);
+    if (messageIds.length > 0) {
+      const placeholders = messageIds.map(() => '?').join(',');
+      const now = Date.now();
+      await db.prepare(`
+        UPDATE message_delivery
+        SET delivered_at = ?
+        WHERE recipient_did = ? AND message_id IN (${placeholders}) AND delivered_at IS NULL
+      `).bind(now, did, ...messageIds).run();
+    }
+
+    // Parse JSON fields
+    const messages = result.results.map((m: any) => ({
+      ...m,
+      wrapped_keys: JSON.parse(m.wrapped_keys)
+    }));
+
+    return c.json({ messages });
+  } catch (error) {
+    console.error('Get inbox error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+```
+
+### src/utils/auth.ts
+
+Firebase Auth token verification.
+
+```typescript
+export async function verifyFirebaseToken(token: string): Promise<{ uid: string; phoneNumber: string }> {
+  // Use Firebase Admin SDK or REST API to verify token
+  // For simplicity, using Firebase REST API
+
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: token })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Invalid token');
+  }
+
+  const data = await response.json();
+  const user = data.users?.[0];
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  return {
+    uid: user.localId,
+    phoneNumber: user.phoneNumber
+  };
+}
+
+// TODO: Set this in wrangler.toml secrets
+const FIREBASE_API_KEY = 'your-firebase-api-key';
+```
+
+### src/utils/crypto.ts
+
+Hashing utilities.
+
+```typescript
+export function hashPhone(phoneNumber: string): string {
+  // Normalize phone number (remove spaces, dashes)
+  const normalized = phoneNumber.replace(/[\s\-\(\)]/g, '');
+
+  // SHA-256 hash
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+
+  return crypto.subtle.digest('SHA-256', data).then(hash => {
+    return Array.from(new Uint8Array(hash))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  });
+}
+```
+
+### package.json
+
+```json
+{
+  "name": "buds-relay",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^3.11.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20231218.0",
+    "wrangler": "^3.22.0",
+    "typescript": "^5.3.3"
+  }
+}
+```
+
+### Deploy Workers
+
+```bash
+# Test locally
+npm run dev
+
+# Deploy to production
+npm run deploy
+```
+
 ---
 
-## Core Components
+## Core Swift Components
 
-### 1. DeviceManager
+### 1. RelayClient
+
+**Location:** `Buds/Buds/Buds/Core/RelayClient.swift` (create new file)
+
+HTTP client for Cloudflare Workers API.
+
+```swift
+//
+//  RelayClient.swift
+//  Buds
+//
+//  Cloudflare Workers relay client
+//
+
+import Foundation
+import FirebaseAuth
+
+class RelayClient {
+    static let shared = RelayClient()
+
+    private let baseURL = "https://api.getbuds.app"  // TODO: Update with your Workers domain
+
+    private init() {}
+
+    // MARK: - Auth Header
+
+    private func getAuthHeader() async throws -> [String: String] {
+        guard let user = Auth.auth().currentUser else {
+            throw RelayError.notAuthenticated
+        }
+
+        let token = try await user.getIDToken()
+        return ["Authorization": "Bearer \(token)"]
+    }
+
+    // MARK: - Device Registration
+
+    func registerDevice(
+        deviceId: String,
+        deviceName: String,
+        pubkeyX25519: String,
+        pubkeyEd25519: String,
+        ownerDID: String
+    ) async throws {
+        let headers = try await getAuthHeader()
+        let url = URL(string: "\(baseURL)/api/devices/register")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+
+        let body: [String: Any] = [
+            "deviceId": deviceId,
+            "deviceName": deviceName,
+            "pubkeyX25519": pubkeyX25519,
+            "pubkeyEd25519": pubkeyEd25519,
+            "ownerDID": ownerDID
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw RelayError.serverError
+        }
+    }
+
+    // MARK: - DID Lookup
+
+    func lookupDID(phoneNumber: String) async throws -> String {
+        let headers = try await getAuthHeader()
+        let url = URL(string: "\(baseURL)/api/lookup/did")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+
+        let body: [String: Any] = ["phoneNumber": phoneNumber]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode == 404 {
+                throw RelayError.userNotFound
+            }
+            throw RelayError.serverError
+        }
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let did = json?["did"] as? String else {
+            throw RelayError.invalidResponse
+        }
+
+        return did
+    }
+
+    // MARK: - Get Devices
+
+    func getDevices(for dids: [String]) async throws -> [[String: Any]] {
+        let headers = try await getAuthHeader()
+        let url = URL(string: "\(baseURL)/api/devices/list")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+
+        let body: [String: Any] = ["dids": dids]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw RelayError.serverError
+        }
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let devices = json?["devices"] as? [[String: Any]] else {
+            throw RelayError.invalidResponse
+        }
+
+        return devices
+    }
+
+    // MARK: - Send Message
+
+    func sendMessage(_ message: EncryptedMessage) async throws {
+        let headers = try await getAuthHeader()
+        let url = URL(string: "\(baseURL)/api/messages/send")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        request.httpBody = try encoder.encode(message)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw RelayError.serverError
+        }
+    }
+
+    // MARK: - Get Inbox
+
+    func getInbox(for did: String) async throws -> [EncryptedMessage] {
+        let headers = try await getAuthHeader()
+        let url = URL(string: "\(baseURL)/api/messages/inbox?did=\(did)")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw RelayError.serverError
+        }
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let messagesArray = json?["messages"] as? [[String: Any]] else {
+            throw RelayError.invalidResponse
+        }
+
+        return try messagesArray.map { dict in
+            try parseEncryptedMessage(dict)
+        }
+    }
+
+    // MARK: - Helper
+
+    private func parseEncryptedMessage(_ dict: [String: Any]) throws -> EncryptedMessage {
+        guard
+            let messageId = dict["message_id"] as? String,
+            let receiptCID = dict["receipt_cid"] as? String,
+            let encryptedPayload = dict["encrypted_payload"] as? String,
+            let wrappedKeys = dict["wrapped_keys"] as? [String: String],
+            let senderDID = dict["sender_did"] as? String,
+            let senderDeviceId = dict["sender_device_id"] as? String,
+            let createdAtMs = dict["created_at"] as? Int64
+        else {
+            throw RelayError.invalidResponse
+        }
+
+        return EncryptedMessage(
+            messageId: messageId,
+            receiptCID: receiptCID,
+            encryptedPayload: encryptedPayload,
+            wrappedKeys: wrappedKeys,
+            senderDID: senderDID,
+            senderDeviceId: senderDeviceId,
+            createdAt: Date(timeIntervalSince1970: Double(createdAtMs) / 1000)
+        )
+    }
+}
+
+// MARK: - Errors
+
+enum RelayError: Error, LocalizedError {
+    case notAuthenticated
+    case serverError
+    case userNotFound
+    case invalidResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .notAuthenticated:
+            return "Not authenticated"
+        case .serverError:
+            return "Server error"
+        case .userNotFound:
+            return "User not found"
+        case .invalidResponse:
+            return "Invalid server response"
+        }
+    }
+}
+```
+
+### 2. DeviceManager
 
 **Location:** `Buds/Buds/Buds/Core/DeviceManager.swift` (create new file)
 
@@ -307,7 +928,6 @@ Manages current device registration and device discovery.
 //
 
 import Foundation
-import FirebaseFunctions
 
 @MainActor
 class DeviceManager: ObservableObject {
@@ -315,8 +935,6 @@ class DeviceManager: ObservableObject {
 
     @Published var currentDevice: Device?
     @Published var isRegistered = false
-
-    private let functions = Functions.functions()
 
     private init() {
         Task {
@@ -337,16 +955,15 @@ class DeviceManager: ObservableObject {
 
         let deviceName = await UIDevice.current.name
 
-        // Call Firebase Function
-        let data: [String: Any] = [
-            "deviceId": deviceId,
-            "deviceName": deviceName,
-            "pubkeyX25519": x25519Keys.publicKey.rawRepresentation.base64EncodedString(),
-            "pubkeyEd25519": ed25519Keys.publicKey.rawRepresentation.base64EncodedString(),
-            "ownerDID": ownerDID
-        ]
+        // Call Cloudflare Workers
+        try await RelayClient.shared.registerDevice(
+            deviceId: deviceId,
+            deviceName: deviceName,
+            pubkeyX25519: x25519Keys.publicKey.rawRepresentation.base64EncodedString(),
+            pubkeyEd25519: ed25519Keys.publicKey.rawRepresentation.base64EncodedString(),
+            ownerDID: ownerDID
+        )
 
-        let result = try await functions.httpsCallable("registerDevice").call(data)
         print("✅ Device registered: \(deviceId)")
 
         // Store locally
@@ -393,14 +1010,9 @@ class DeviceManager: ObservableObject {
     // MARK: - Get Devices for DIDs
 
     func getDevices(for dids: [String]) async throws -> [Device] {
-        let data: [String: Any] = ["dids": dids]
-        let result = try await functions.httpsCallable("getDevices").call(data)
+        let devicesData = try await RelayClient.shared.getDevices(for: dids)
 
-        guard let devices = result.data as? [[String: Any]] else {
-            throw DeviceError.invalidResponse
-        }
-
-        return try devices.map { dict in
+        return try devicesData.map { dict in
             try parseDevice(dict)
         }
     }
@@ -427,7 +1039,7 @@ class DeviceManager: ObservableObject {
             pubkeyX25519: pubkeyX25519,
             pubkeyEd25519: pubkeyEd25519,
             status: status,
-            registeredAt: Date(),  // Simplified: use server timestamp if needed
+            registeredAt: Date(),
             lastSeenAt: nil
         )
     }
@@ -450,7 +1062,7 @@ enum DeviceError: Error, LocalizedError {
 }
 ```
 
-### 2. E2EEManager
+### 3. E2EEManager
 
 **Location:** `Buds/Buds/Buds/Core/E2EEManager.swift` (create new file)
 
@@ -613,9 +1225,9 @@ class E2EEManager {
         _ wrappedData: Data,
         fromSender senderDeviceId: String,
         myPrivateKey: Curve25519.KeyAgreement.PrivateKey
-    ) throws -> SymmetricKey {
-        // 1. Get sender's public key from local DB or Firebase
-        let senderDevice = try getDeviceFromDB(deviceId: senderDeviceId)
+    ) async throws -> SymmetricKey {
+        // 1. Get sender's public key from local DB
+        let senderDevice = try await getDeviceFromDB(deviceId: senderDeviceId)
 
         guard let senderPubkeyData = Data(base64Encoded: senderDevice.pubkeyX25519) else {
             throw E2EEError.invalidPublicKey
@@ -661,10 +1273,19 @@ class E2EEManager {
 
     // MARK: - Helper
 
-    private func getDeviceFromDB(deviceId: String) throws -> Device {
-        // TODO: Query local DB or fetch from Firebase if not cached
-        // For now, simplified version
-        fatalError("Not implemented - should query devices table")
+    private func getDeviceFromDB(deviceId: String) async throws -> Device {
+        let db = Database.shared
+        let device = try await db.readAsync { db in
+            try Device
+                .filter(Device.Columns.deviceId == deviceId)
+                .fetchOne(db)
+        }
+
+        guard let device = device else {
+            throw E2EEError.deviceNotFound
+        }
+
+        return device
     }
 }
 
@@ -675,6 +1296,7 @@ enum E2EEError: Error, LocalizedError {
     case invalidWrappedKey
     case invalidPayload
     case invalidPublicKey
+    case deviceNotFound
 
     var errorDescription: String? {
         switch self {
@@ -686,12 +1308,14 @@ enum E2EEError: Error, LocalizedError {
             return "Invalid encrypted payload"
         case .invalidPublicKey:
             return "Invalid public key"
+        case .deviceNotFound:
+            return "Device not found in local database"
         }
     }
 }
 ```
 
-### 3. EncryptedMessage Model
+### 4. EncryptedMessage Model
 
 **Location:** `Buds/Buds/Buds/Core/Models/EncryptedMessage.swift` (create new file)
 
@@ -726,11 +1350,11 @@ struct EncryptedMessage: Codable {
 }
 ```
 
-### 4. ShareManager
+### 5. ShareManager
 
 **Location:** `Buds/Buds/Buds/Core/ShareManager.swift` (create new file)
 
-Orchestrates the sharing flow (combines E2EE + Firebase).
+Orchestrates the sharing flow (combines E2EE + Cloudflare Workers).
 
 ```swift
 //
@@ -741,15 +1365,13 @@ Orchestrates the sharing flow (combines E2EE + Firebase).
 //
 
 import Foundation
-import FirebaseFunctions
+import Combine
 
 @MainActor
 class ShareManager: ObservableObject {
     static let shared = ShareManager()
 
     @Published var isSharing = false
-
-    private let functions = Functions.functions()
 
     private init() {}
 
@@ -785,18 +1407,9 @@ class ShareManager: ObservableObject {
             recipientDevices: recipientDevices
         )
 
-        // 4. Send to Firebase
-        let data: [String: Any] = [
-            "messageId": encryptedMessage.messageId,
-            "receiptCID": encryptedMessage.receiptCID,
-            "encryptedPayload": encryptedMessage.encryptedPayload,
-            "wrappedKeys": encryptedMessage.wrappedKeys,
-            "recipientDIDs": circleDIDs,
-            "senderDID": encryptedMessage.senderDID,
-            "senderDeviceId": encryptedMessage.senderDeviceId
-        ]
+        // 4. Send to Cloudflare Workers
+        try await RelayClient.shared.sendMessage(encryptedMessage)
 
-        let result = try await functions.httpsCallable("sendMessage").call(data)
         print("✅ Memory shared: \(memoryCID)")
 
         // 5. Mark memory as shared locally
@@ -806,12 +1419,9 @@ class ShareManager: ObservableObject {
     // MARK: - Mark as Shared
 
     private func markMemoryAsShared(_ memoryCID: String, recipientDIDs: [String]) async throws {
-        let db = Database.shared
-        try await db.writeAsync { db in
-            // Update local_receipts.is_shared or create shared_memories entry
-            // For now, simplified
-            print("TODO: Mark memory as shared in local DB")
-        }
+        // Update local_receipts or create shared_memories entry
+        // For now, just log
+        print("TODO: Mark memory as shared in local DB")
     }
 }
 
@@ -900,7 +1510,7 @@ Update `BudsApp.swift` to register device after auth.
 
 ### Step 3: Update CircleManager to Use Real DIDs
 
-Replace placeholder DID generation with Firebase lookup.
+Replace placeholder DID generation with Cloudflare Workers lookup.
 
 **Location:** `Buds/Buds/Buds/Core/CircleManager.swift`
 
@@ -910,25 +1520,18 @@ func addMember(phoneNumber: String, displayName: String) async throws {
         throw CircleError.circleFull
     }
 
-    // Look up DID via Firebase
-    let functions = Functions.functions()
-    let data: [String: Any] = ["phoneNumber": phoneNumber]
-    let result = try await functions.httpsCallable("lookupDID").call(data)
-
-    guard let did = result.data as? [String: Any],
-          let didString = did["did"] as? String else {
-        throw CircleError.userNotFound
-    }
+    // Look up DID via Cloudflare Workers
+    let did = try await RelayClient.shared.lookupDID(phoneNumber: phoneNumber)
 
     // Get their devices
-    let devices = try await DeviceManager.shared.getDevices(for: [didString])
+    let devices = try await DeviceManager.shared.getDevices(for: [did])
     guard let firstDevice = devices.first else {
         throw CircleError.userNotRegistered
     }
 
     let member = CircleMember(
         id: UUID().uuidString,
-        did: didString,
+        did: did,
         displayName: displayName,
         phoneNumber: phoneNumber,
         avatarCID: nil,
@@ -986,9 +1589,13 @@ enum CircleError: Error, LocalizedError {
 
 **Location:** `Buds/Buds/Buds/Features/Timeline/MemoryDetailView.swift`
 
-Add share button in toolbar:
+Add state and share button in toolbar:
 
 ```swift
+@State private var showingShareSheet = false
+
+// ... in body:
+
 .toolbar {
     ToolbarItem(placement: .navigationBarTrailing) {
         Menu {
@@ -1187,38 +1794,55 @@ struct MemberSelectionRow: View {
 
 ## Testing Checkpoints
 
-### Checkpoint 1: Device Registration
+### Checkpoint 1: Cloudflare Workers Setup
+- ✅ Workers project created and deployed
+- ✅ D1 database initialized with schema
+- ✅ Local dev server runs: `npm run dev`
+- ✅ Health check works: `curl http://localhost:8787/health`
+
+### Checkpoint 2: Device Registration
 - ✅ App launches and registers device on first sign-in
 - ✅ Console shows "✅ Device registered: [deviceId]"
-- ✅ Firebase Console → Firestore → `devices` collection has entry
-- ✅ `phone_to_did` collection maps phone → DID
+- ✅ D1 database → `devices` table has entry
+- ✅ `phone_to_did` table maps phone → DID
 
-### Checkpoint 2: Circle Member Lookup
+### Checkpoint 3: Circle Member Lookup
 - ✅ Add Circle member with real phone number (must be registered user)
 - ✅ Sees real DID (not placeholder)
 - ✅ Member shows "active" status
 - ✅ Console shows "✅ Added Circle member: [name]"
 
-### Checkpoint 3: E2EE Encryption
+### Checkpoint 4: E2EE Encryption
 - ✅ Share memory to 1 Circle member
 - ✅ Console shows encryption process (key wrapping, device lookup)
-- ✅ Firebase Console → `encrypted_messages` collection has entry
+- ✅ D1 → `encrypted_messages` table has entry
 - ✅ `encrypted_payload` and `wrapped_keys` are base64 strings
 
-### Checkpoint 4: Message Delivery (Manual Test)
-- ✅ Use Firebase Console to trigger FCM push
-- ✅ Recipient device receives push notification
-- ✅ App downloads encrypted message
+### Checkpoint 5: Message Delivery (Manual Test)
+- ✅ Recipient polls inbox: GET `/api/messages/inbox?did=xxx`
+- ✅ Receives encrypted message
 - ✅ Successfully decrypts and displays memory
+- ✅ `message_delivery` table marks as delivered
 
 ---
 
 ## Troubleshooting
 
-### Build Errors
+### Cloudflare Workers Errors
 
-**"Cannot find 'Functions' in scope"**
-→ Add Firebase Functions SDK to project: `https://github.com/firebase/firebase-ios-sdk`
+**"Binding DB is not defined"**
+→ Check `wrangler.toml` has correct D1 binding and database ID
+
+**"Failed to execute query"**
+→ Run schema migration: `npx wrangler d1 execute buds-relay-db --remote --file=schema.sql`
+
+**"CORS error"**
+→ Check CORS middleware in `src/index.ts` allows your app domain
+
+### Swift Build Errors
+
+**"Cannot find 'RelayClient' in scope"**
+→ Add `RelayClient.swift` to Xcode project target
 
 **"Ambiguous use of 'seal'"**
 → Make sure you're importing `CryptoKit`, not a conflicting crypto library
@@ -1234,13 +1858,8 @@ struct MemberSelectionRow: View {
 **"User not found"**
 → Phone number hasn't registered with Buds yet (expected for new users)
 
-### Firebase Errors
-
-**"PERMISSION_DENIED"**
-→ Check Firestore security rules allow authenticated reads/writes
-
-**"Function not found"**
-→ Deploy Cloud Functions: `firebase deploy --only functions`
+**"Invalid token"**
+→ Firebase Auth token expired, re-authenticate
 
 ---
 
@@ -1249,38 +1868,48 @@ struct MemberSelectionRow: View {
 Phase 7 will add:
 1. **Message Inbox** - View received shared memories
 2. **Map View** - Visualize memories with fuzzy location
-3. **Push Notifications** - Real-time delivery alerts
-4. **Message Syncing** - Background fetch for new messages
+3. **Push Notifications** - Real-time delivery via APNs
+4. **Background Sync** - Periodic polling for new messages
 
-**For now:** Phase 6 creates the E2EE foundation. Messages can be shared manually, decryption works locally.
+**For now:** Phase 6 creates the E2EE foundation with Cloudflare Workers relay.
 
 ---
 
 ## Summary
 
-**Files Created (6):**
+**Cloudflare Workers (TypeScript):**
+- `src/index.ts` - Main router (~50 lines)
+- `src/handlers/devices.ts` - Device registration (~120 lines)
+- `src/handlers/lookup.ts` - DID lookup (~60 lines)
+- `src/handlers/messages.ts` - Message send/receive (~150 lines)
+- `src/utils/auth.ts` - Firebase token verification (~40 lines)
+- `src/utils/crypto.ts` - Phone hashing (~20 lines)
+- **Total:** ~440 lines TypeScript
+
+**Swift Components:**
+- `Core/RelayClient.swift` (~250 lines)
 - `Core/DeviceManager.swift` (~150 lines)
 - `Core/E2EEManager.swift` (~200 lines)
 - `Core/ShareManager.swift` (~80 lines)
 - `Core/Models/EncryptedMessage.swift` (~25 lines)
 - `Features/Share/ShareToCircleView.swift` (~150 lines)
-- `functions/index.ts` (Firebase Functions - ~200 lines)
+- **Total:** ~855 lines Swift
 
-**Files Modified (4):**
+**Files Modified (3):**
 - `Core/ChaingeKernel/IdentityManager.swift` (+30 lines: device ID, X25519 keypair)
 - `Core/CircleManager.swift` (+30 lines: real DID lookup)
-- `Features/Timeline/MemoryDetailView.swift` (+10 lines: share button)
+- `Features/Timeline/MemoryDetailView.swift` (+15 lines: share button)
 - `BudsApp.swift` (+5 lines: device registration on launch)
 
-**Firebase Setup:**
-- 3 Firestore collections (devices, encrypted_messages, phone_to_did)
-- 4 Cloud Functions (registerDevice, lookupDID, getDevices, sendMessage)
-- Security rules for read/write access
+**Infrastructure:**
+- Cloudflare Workers relay (edge compute)
+- D1 database (SQLite at the edge)
+- Firebase Auth only (phone verification)
 
-**Estimated Lines of Code:** ~850 lines Swift + 200 lines TypeScript
+**Estimated Time:** 10-14 hours (includes Workers setup + testing)
 
-**Next Steps:** Test E2EE flow end-to-end, then proceed to Phase 7 (UI polish + message inbox).
+**Next Steps:** Test E2EE flow end-to-end, then proceed to Phase 7 (message inbox + push notifications).
 
 ---
 
-**December 20, 2025: Ready to implement Phase 6! Let's add real E2EE sharing. 🔐🌿**
+**December 20, 2025: Ready to implement Phase 6 with Cloudflare Workers! Let's build the relay. 🔐🌿**
