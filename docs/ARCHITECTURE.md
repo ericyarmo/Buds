@@ -1,8 +1,8 @@
 # Buds v0.1 — System Architecture
 
-**Last Updated:** December 16, 2025
-**Status:** Pre-Development Planning
-**Target:** TestFlight Launch (estimated 2-4 weeks, subject to adjustments)
+**Last Updated:** December 20, 2025
+**Status:** Phase 5 Complete (Circle Mechanics) — Phase 6 Next (E2EE Relay)
+**Target:** TestFlight v2 with E2EE Sharing (Phase 6-7)
 
 ---
 
@@ -12,11 +12,13 @@
 2. [System Overview](#system-overview)
 3. [Core Principles](#core-principles)
 4. [Architecture Layers](#architecture-layers)
-5. [Technology Stack](#technology-stack)
-6. [Data Flow](#data-flow)
-7. [Security Model](#security-model)
-8. [Performance Requirements](#performance-requirements)
-9. [Related Documentation](#related-documentation)
+5. [Circle Architecture](#circle-architecture)
+6. [Multi-Device E2EE Architecture](#multi-device-e2ee-architecture)
+7. [Technology Stack](#technology-stack)
+8. [Data Flow](#data-flow)
+9. [Security Model](#security-model)
+10. [Performance Requirements](#performance-requirements)
+11. [Related Documentation](#related-documentation)
 
 ---
 
@@ -241,6 +243,177 @@ struct Citation {
     let claimedTime: Date              // From receipt's claimed_time_ms
 }
 ```
+
+---
+
+## Circle Architecture
+
+### Privacy-First Friend Groups (Max 12 Members)
+
+Buds implements a **local-first Circle roster** where your friend list never leaves your device. Only encrypted messages are sent through the relay server, creating a zero-knowledge architecture for social graphs.
+
+#### Circle Member Model
+
+```swift
+struct CircleMember: Identifiable {
+    let id: UUID                           // Local UUID
+    let did: String                        // Member DID (did:buds:<base58(pubkey)>)
+    var displayName: String                // Local nickname (privacy-preserving)
+    var phoneNumber: String?               // Optional, for display only
+    var avatarCID: String?                 // Profile photo blob CID
+    let pubkeyX25519: String               // X25519 public key for E2EE
+    var status: CircleStatus               // pending | active | removed
+    var joinedAt: Date?
+    var invitedAt: Date?
+    var removedAt: Date?
+}
+
+enum CircleStatus: String {
+    case pending  // Invited, not yet accepted (placeholder DID)
+    case active   // DID lookup succeeded, can share
+    case removed  // Removed from Circle
+}
+```
+
+#### Privacy Model
+
+**Local-Only Roster**:
+- Friend list stored only in local GRDB (`circles` table)
+- Relay server NEVER sees your social graph
+- Display names are local nicknames (not global usernames)
+
+**Phone Number Handling**:
+- User enters phone number to add friend
+- Client hashes phone with SHA-256 before sending to relay
+- Relay looks up DID from hashed phone (one-way mapping)
+- Phone number stored locally for display only
+- **Never sent to relay in plaintext**
+- **Never stored in receipts**
+
+**DID Lookup Flow** (Phase 6):
+```
+User adds friend by phone: "+14155551234"
+  ↓
+1. Hash phone: SHA-256("+14155551234") = "a7b3c..."
+2. POST /api/lookup/did { phoneHash: "a7b3c..." }
+3. Relay queries: SELECT did FROM phone_to_did WHERE phone_hash = "a7b3c..."
+4. Returns: { did: "did:buds:abc123..." }
+5. Client stores CircleMember with real DID, status = active
+```
+
+**No Global Username Namespace**:
+- Display names are local-only (you choose what to call each friend)
+- No public profile pages
+- No friend discovery/search
+- Invite-only (requires phone number)
+
+#### 12-Member Limit Rationale
+
+**Privacy**: Small, trusted group (intimate friend circle, not social network)
+**Key Distribution**: Manageable E2EE key wrapping for each device
+**UX**: Dunbar-adjacent number (meaningful relationships)
+**Performance**: No O(n²) scaling issues (12² = 144 device pairs max)
+
+---
+
+## Multi-Device E2EE Architecture
+
+### Device-Based Key Distribution
+
+Buds supports **multiple devices per user** (e.g., Alice has iPhone + iPad). Each device gets its own keypair and must be able to decrypt shared memories independently.
+
+#### Device Model
+
+```swift
+struct Device {
+    let deviceId: UUID                     // Unique device identifier
+    let ownerDID: String                   // DID of device owner
+    var deviceName: String                 // "Alice's iPhone", "Alice's iPad"
+    let pubkeyX25519: String               // Device-specific X25519 pubkey
+    let pubkeyEd25519: String              // Device-specific Ed25519 pubkey
+    var status: DeviceStatus               // active | revoked
+    var registeredAt: Date
+    var lastSeenAt: Date?
+}
+```
+
+#### Device Registration Flow (Phase 6)
+
+```
+App First Launch:
+  ↓
+1. Generate device_id (UUID)
+2. Generate X25519 keypair (for E2EE)
+3. Generate Ed25519 keypair (for signing)
+4. Store in Keychain (kSecAttrAccessibleWhenUnlockedThisDeviceOnly)
+5. POST /api/devices/register {
+     deviceId: "uuid",
+     deviceName: "Alice's iPhone",
+     pubkeyX25519: "base64...",
+     pubkeyEd25519: "base64...",
+     ownerDID: "did:buds:abc123"
+   }
+6. Relay stores device in devices table
+```
+
+#### Multi-Device Key Wrapping
+
+When Alice (2 devices) shares a memory with Bob (2 devices):
+
+```
+1. Alice's iPhone generates ephemeral AES-256 key (K_msg)
+2. Encrypts memory: C = AES-GCM(K_msg, memory_payload)
+3. Query relay for all devices:
+   - Alice: [iPhone, iPad]
+   - Bob: [iPhone, iPad]
+   Total: 4 devices
+
+4. For each device, wrap K_msg:
+   - K_wrap_alice_iphone = X25519_wrap(alice_iphone_pubkey, K_msg)
+   - K_wrap_alice_ipad = X25519_wrap(alice_ipad_pubkey, K_msg)
+   - K_wrap_bob_iphone = X25519_wrap(bob_iphone_pubkey, K_msg)
+   - K_wrap_bob_ipad = X25519_wrap(bob_ipad_pubkey, K_msg)
+
+5. POST /api/messages/send {
+     encryptedPayload: "base64(C)",
+     nonce: "base64...",
+     wrappedKeys: {
+       "alice-iphone-uuid": "base64(K_wrap_alice_iphone)",
+       "alice-ipad-uuid": "base64(K_wrap_alice_ipad)",
+       "bob-iphone-uuid": "base64(K_wrap_bob_iphone)",
+       "bob-ipad-uuid": "base64(K_wrap_bob_ipad)"
+     }
+   }
+
+6. Each device polls inbox, finds wrapped key for its device_id, unwraps, decrypts
+```
+
+#### Device Revocation
+
+**Problem**: Alice loses her iPad, needs to revoke it without affecting her iPhone.
+
+**Solution**:
+```
+1. Alice uses iPhone to POST /api/devices/revoke { deviceId: "ipad-uuid" }
+2. Relay marks device status = "revoked"
+3. Future shares skip revoked devices (no wrapped key generated)
+4. Alice's iPad can no longer decrypt new messages
+5. Alice's iPhone continues working normally
+```
+
+**Note**: Revocation does NOT delete old messages already received on the iPad. This is a fundamental limitation of E2EE—you cannot remotely delete data from someone else's device.
+
+#### Key Rotation Strategy
+
+**Current (Phase 6)**: No automatic key rotation
+**Future (Phase 7+)**: Periodic device re-registration with new keypairs
+
+**Rotation Flow**:
+1. Generate new X25519 keypair
+2. POST /api/devices/rotate-key { deviceId, newPubkey }
+3. Relay updates device record
+4. Old wrapped keys remain valid (backward compatibility)
+5. New shares use new pubkey
 
 ---
 

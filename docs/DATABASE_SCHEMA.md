@@ -1,8 +1,8 @@
 # Buds Database Schema (GRDB)
 
-**Last Updated:** December 16, 2025
+**Last Updated:** December 20, 2025
 **Database:** SQLite via GRDB
-**Version:** v0.1
+**Version:** v0.1 (Migration v3)
 
 ---
 
@@ -91,11 +91,10 @@ CREATE TABLE local_receipts (
     is_favorited INTEGER NOT NULL DEFAULT 0,    -- Boolean (0/1)
     tags_json TEXT,                             -- JSON array: ["night", "social"]
     local_notes TEXT,                           -- Private notes (not in receipt)
-    image_cid TEXT,                             -- Primary photo CID
+    image_cids TEXT,                            -- JSON array of CIDs: ["bafyrei...", "bafyrei..."] (up to 3)
     created_at REAL NOT NULL,                   -- Local insert time
     updated_at REAL NOT NULL,                   -- Last local update
-    FOREIGN KEY (header_cid) REFERENCES ucr_headers(cid) ON DELETE CASCADE,
-    FOREIGN KEY (image_cid) REFERENCES blobs(cid) ON DELETE SET NULL
+    FOREIGN KEY (header_cid) REFERENCES ucr_headers(cid) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_local_receipts_header ON local_receipts(header_cid);
@@ -107,7 +106,7 @@ CREATE INDEX idx_local_receipts_created ON local_receipts(created_at DESC);
 - `uuid` is app-local (not shared)
 - **1:1 relationship**: Each `header_cid` appears exactly once (enforced by UNIQUE constraint)
 - Your own authored receipts and Circle-received receipts both get entries here
-- **`image_cid`**: Primary thumbnail blob CID, derived from first blob in `receipt_blobs` (convenience pointer for quick queries)
+- **`image_cids`**: JSON array of blob CIDs for up to 3 photos per memory (Phase 3: multi-image support)
 
 ---
 
@@ -121,7 +120,8 @@ CREATE INDEX idx_local_receipts_created ON local_receipts(created_at DESC);
 CREATE TABLE circles (
     id TEXT PRIMARY KEY NOT NULL,               -- UUID
     did TEXT NOT NULL UNIQUE,                   -- Member DID
-    display_name TEXT NOT NULL,                 -- Display name
+    display_name TEXT NOT NULL,                 -- Local nickname (privacy-preserving)
+    phone_number TEXT,                          -- Optional, for display only (never in receipts)
     avatar_cid TEXT,                            -- Profile photo CID
     pubkey_x25519 TEXT NOT NULL,                -- Base64 public key for E2EE
     status TEXT NOT NULL,                       -- 'pending' | 'active' | 'removed'
@@ -140,7 +140,40 @@ CREATE INDEX idx_circles_status ON circles(status);
 **Notes**:
 - Max 12 active members (enforced in app layer)
 - `status`: `pending` (invited, not accepted), `active`, `removed`
-- `pubkey_x25519` used for E2EE key wrapping
+- `pubkey_x25519` used for E2EE key wrapping (one per member, Phase 5)
+- **Phase 6**: Will query relay for all devices per DID and wrap keys for each device
+- **Privacy**: `phone_number` stored locally for display only, never sent to relay (hashed with SHA-256 for lookups)
+- **Privacy**: `display_name` is local-only nickname, not shared globally
+
+---
+
+### `devices` (Multi-Device Support)
+
+**Track devices for E2EE key distribution**
+
+```sql
+CREATE TABLE devices (
+    device_id TEXT PRIMARY KEY NOT NULL,        -- UUID (generated on device registration)
+    owner_did TEXT NOT NULL,                    -- DID of device owner
+    device_name TEXT NOT NULL,                  -- "Alice's iPhone", "Alice's iPad"
+    pubkey_x25519 TEXT NOT NULL,                -- Device-specific X25519 pubkey (base64)
+    pubkey_ed25519 TEXT NOT NULL,               -- Device-specific Ed25519 pubkey (base64)
+    status TEXT NOT NULL,                       -- 'active' | 'revoked'
+    registered_at REAL NOT NULL,                -- When device registered with relay
+    last_seen_at REAL                           -- Last time device polled inbox
+);
+
+CREATE INDEX idx_devices_owner ON devices(owner_did);
+CREATE INDEX idx_devices_status ON devices(status);
+```
+
+**Notes**:
+- **Multi-device E2EE**: Each device gets unique X25519 keypair for key wrapping
+- **Device-based encryption**: When sharing, wrap AES key for each recipient device (not just per DID)
+- **Example**: Alice has iPhone + iPad → both devices get wrapped keys
+- **Phase 5**: Table schema created but unused (placeholder DIDs only)
+- **Phase 6**: Devices registered with Cloudflare relay on first launch, queried for E2EE sharing
+- **Security**: `status = 'revoked'` allows device removal without affecting other devices
 
 ---
 
@@ -512,31 +545,81 @@ Using GRDB's `DatabaseMigrator`:
 ```swift
 var migrator = DatabaseMigrator()
 
-// v1: Initial schema
+// v1: Initial schema (Phase 0-2)
 migrator.registerMigration("v1") { db in
-    // Create all tables from above
+    // Create ucr_headers, local_receipts, locations, blobs, receipt_blobs
+    // See Database.swift for full schema
 }
 
-// v2: Add fuzzy location fields
+// v2: Multi-image support (Phase 3)
 migrator.registerMigration("v2") { db in
-    try db.alter(table: "locations") { t in
-        t.add(column: "fuzzy_lat", .real)
-        t.add(column: "fuzzy_lon", .real)
-        t.add(column: "fuzzy_radius", .integer)
+    // Rename image_cid → image_cids (JSON array)
+    try db.alter(table: "local_receipts") { t in
+        t.add(column: "image_cids_temp", .text)
     }
+
+    // Migrate data: convert single CID to JSON array
+    try db.execute(sql: """
+        UPDATE local_receipts
+        SET image_cids_temp = json_array(image_cid)
+        WHERE image_cid IS NOT NULL
+    """)
+
+    // Drop old column, rename new
+    try db.alter(table: "local_receipts") { t in
+        t.drop(column: "image_cid")
+    }
+    try db.execute(sql: "ALTER TABLE local_receipts RENAME COLUMN image_cids_temp TO image_cids")
 }
 
-// v3: Add FTS5 index
+// v3: Circle mechanics (Phase 5)
 migrator.registerMigration("v3") { db in
-    try db.create(virtualTable: "fts_memories", using: FTS5()) { t in
-        t.column("cid")
-        t.column("product_name")
-        t.column("strain_name")
-        t.column("notes")
-        t.column("location_name")
-    }
+    // Create circles table
+    try db.execute(sql: """
+        CREATE TABLE circles (
+            id TEXT PRIMARY KEY NOT NULL,
+            did TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            phone_number TEXT,
+            avatar_cid TEXT,
+            pubkey_x25519 TEXT NOT NULL,
+            status TEXT NOT NULL,
+            joined_at REAL,
+            invited_at REAL,
+            removed_at REAL,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        )
+    """)
+
+    try db.execute(sql: "CREATE INDEX idx_circles_did ON circles(did)")
+    try db.execute(sql: "CREATE INDEX idx_circles_status ON circles(status)")
+
+    // Drop and recreate devices table with new schema
+    try db.execute(sql: "DROP TABLE IF EXISTS devices")
+
+    try db.execute(sql: """
+        CREATE TABLE devices (
+            device_id TEXT PRIMARY KEY NOT NULL,
+            owner_did TEXT NOT NULL,
+            device_name TEXT NOT NULL,
+            pubkey_x25519 TEXT NOT NULL,
+            pubkey_ed25519 TEXT NOT NULL,
+            status TEXT NOT NULL,
+            registered_at REAL NOT NULL,
+            last_seen_at REAL
+        )
+    """)
+
+    try db.execute(sql: "CREATE INDEX idx_devices_owner ON devices(owner_did)")
+    try db.execute(sql: "CREATE INDEX idx_devices_status ON devices(status)")
 }
 ```
+
+**Migration History**:
+- **v1** (Phase 0-2): Base schema with ucr_headers, local_receipts, locations, blobs
+- **v2** (Phase 3): Multi-image support - `image_cid` → `image_cids` (JSON array, up to 3 photos)
+- **v3** (Phase 5): Circle mechanics - `circles` table + updated `devices` table for multi-device E2EE
 
 ---
 
@@ -548,7 +631,7 @@ migrator.registerMigration("v3") { db in
 SELECT
     lr.uuid,
     lr.is_favorited,
-    lr.image_cid,
+    lr.image_cids,  -- JSON array of CIDs (up to 3)
     h.cid,
     h.receipt_type,
     h.payload_json,
@@ -660,13 +743,19 @@ LIMIT 100;
 | ucr_headers | ~2 KB | 1,000 | 2 MB |
 | local_receipts | ~0.5 KB | 1,000 | 0.5 MB |
 | locations | ~0.3 KB | 500 | 0.15 MB |
-| blobs (meta only) | ~0.2 KB | 1,500 | 0.3 MB |
+| blobs (meta only) | ~0.2 KB | 3,000 | 0.6 MB |
 | circles | ~0.3 KB | 12 | 0.004 MB |
+| devices | ~0.3 KB | 24 | 0.007 MB |
 | fts_memories | ~1 KB | 1,000 | 1 MB |
-| **Total (metadata)** | | | **~4 MB** |
-| **Photos** (2 MB each) | | 1,500 | **3 GB** |
+| **Total (metadata)** | | | **~4.3 MB** |
+| **Photos** (2 MB each) | | 3,000 | **6 GB** |
 
-**Total: ~3 GB for 1 year of heavy use**
+**Total: ~6 GB for 1 year of heavy use** (assuming ~3 photos per memory average)
+
+**Notes**:
+- Phase 3 added multi-image support (up to 3 photos per memory)
+- Photo count estimate: 1,000 memories × 3 photos = 3,000 photos
+- Devices: Assumes 12 Circle members × 2 devices each = 24 devices tracked
 
 ---
 
@@ -688,7 +777,8 @@ DELETE FROM blobs
 WHERE cid NOT IN (
     SELECT blob_cid FROM receipt_blobs
     UNION
-    SELECT image_cid FROM local_receipts WHERE image_cid IS NOT NULL
+    -- Extract all CIDs from image_cids JSON array
+    SELECT value FROM local_receipts, json_each(image_cids) WHERE image_cids IS NOT NULL
     UNION
     SELECT avatar_cid FROM circles WHERE avatar_cid IS NOT NULL
 );

@@ -1,7 +1,7 @@
 # Buds Privacy Architecture
 
-**Last Updated:** December 16, 2025
-**Version:** v0.1
+**Last Updated:** December 20, 2025
+**Version:** v0.1 (Phase 5: Circle Privacy Model Complete)
 **Principle:** Privacy by Default, Consent Before Collection
 
 ---
@@ -23,6 +23,9 @@ These guardrails must never be violated:
 3. **Receipts contain no phone/email/name** - DIDs are cryptographic identifiers only
 4. **Relay never sees plaintext** - E2EE for all Circle shares (relay sees only ciphertext + pseudonymous metadata)
 5. **Unshare is best-effort, not retroactive delete** - Cannot force deletion on already-synced peer devices
+6. **Circle roster is local-only** - Friend list never leaves your device (relay never sees who's in your Circle)
+7. **Phone numbers hashed client-side** - Relay never sees plaintext phone numbers (SHA-256 hash only)
+8. **Display names are local nicknames** - No global username namespace (privacy-preserving)
 
 ---
 
@@ -351,6 +354,163 @@ func encryptMemoryPayload(
 
 ---
 
+## Circle Privacy Model (Phase 5+)
+
+### Local-Only Friend Rosters
+
+Buds implements a **zero-knowledge social graph** architecture:
+
+**What the relay server CANNOT see:**
+- Your Circle roster (who your friends are)
+- Friend display names (local nicknames only)
+- Who you're sharing with (only encrypted messages + device IDs, no DID→name mapping)
+
+**What the relay server CAN see (metadata leakage):**
+- Hashed phone numbers during lookups (SHA-256, one-way)
+- Device IDs that message each other (pseudonymous social graph)
+- Message frequency between devices (traffic analysis)
+- IP addresses (temporarily, for abuse prevention)
+
+**Architecture comparison:**
+
+| Privacy Property | Buds (Local Roster) | Centralized Platform (Server Roster) |
+|------------------|---------------------|-------------------------------------|
+| **Friend list** | Stored on device only | Stored on server |
+| **Display names** | Local nicknames | Global usernames |
+| **Social graph** | Server sees message metadata only | Server sees full friend graph |
+| **Discovery** | Phone hash lookup (one-way) | Server-side search |
+| **Privacy level** | **Pseudonymous metadata** | Full social graph visible |
+
+**Important distinction:** This is **NOT anonymous** (relay sees pseudonymous device/DID identifiers), but it's **privacy-preserving** (relay doesn't know real-world identities or your friend list).
+
+---
+
+### Phone Number Privacy
+
+**Problem:** How to find friends by phone number without giving the relay everyone's phone numbers?
+
+**Solution:** Client-side hashing + one-way lookup table
+
+**Flow:**
+
+```swift
+// Adding a friend
+User enters: "+14155551234"
+  ↓
+Client hashes: SHA-256("+14155551234") = "a7b3c4d5e6f7..."
+  ↓
+Client queries: POST /api/lookup/did { phoneHash: "a7b3c4d5e6f7..." }
+  ↓
+Relay responds: { did: "did:buds:abc123" }
+  ↓
+Client stores: CircleMember(did="did:buds:abc123", displayName="Alice", phoneNumber="+14155551234")
+  ↓
+Phone number lives ONLY on your device (never sent to relay, never in receipts)
+```
+
+**Privacy guarantees:**
+
+✅ **Relay never sees plaintext phone numbers** (SHA-256 hash only)
+✅ **Phone numbers never in receipts** (only DIDs)
+✅ **Phone numbers stored locally only** (optional display field)
+❌ **Phone hash is queryable** (anyone who knows a phone number can hash it and query the relay)
+
+**Attack vector:** Rainbow table attack
+
+- Attacker could precompute SHA-256 hashes for all US phone numbers (~400M hashes)
+- Query relay for each hash → build a "who's using Buds" database
+- **Mitigation:** Rate limiting (20 lookups/minute) makes bulk scraping impractical
+- **Trade-off:** We prioritize UX (easy friend discovery) over perfect anonymity
+
+**Why not use a keyed hash (HMAC)?**
+- HMAC requires a secret key shared between all clients
+- If key leaks, entire system breaks
+- SHA-256 is simple, transparent, and doesn't rely on secret key security
+
+---
+
+### Display Names: Local Nicknames, Not Global Usernames
+
+**Privacy principle:** No global username namespace
+
+**Implementation:**
+
+```swift
+// Alice adds Bob to her Circle
+Alice's device stores:
+  CircleMember(did="did:buds:bob123", displayName="Bobby")
+
+// Bob adds Alice to his Circle
+Bob's device stores:
+  CircleMember(did="did:buds:alice456", displayName="Mom")
+
+// Relay server NEVER sees "Bobby" or "Mom"
+// Each user chooses their own nicknames for friends
+```
+
+**Privacy benefits:**
+
+✅ **No username enumeration** (can't scrape a user directory)
+✅ **Flexibility** (call your friend "Mom" instead of their legal name)
+✅ **Offline functionality** (no server lookup to display names)
+✅ **Privacy-preserving** (relay can't build a real-name → DID mapping)
+
+**Trade-off:** Circle members don't control how you refer to them in your app
+
+---
+
+### Circle Metadata Leakage
+
+**What the relay CAN infer from encrypted messages:**
+
+1. **Device communication graph**
+   - Device A messages Device B, C, D
+   - Frequency: A messages B 5x/day
+   - Inference: A and B likely in each other's Circle
+
+2. **Timing patterns**
+   - Messages sent at 4:20pm consistently
+   - Inference: Possible usage pattern (cannabis culture reference)
+
+3. **Message sizes**
+   - Encrypted payload 5KB → likely text-only
+   - Encrypted payload 500KB → likely includes photo
+   - Inference: Photo-heavy shares vs text-only
+
+4. **IP address clustering**
+   - Devices X, Y, Z all connect from same IP range
+   - Inference: Possible geographic proximity
+
+**Mitigations (current):**
+- Rate limiting (prevents bulk scraping)
+- Short retention (7 days max)
+- No long-term analytics
+
+**Future enhancements (post-v0.1, non-committed):**
+- Padding messages to uniform size (hides photo vs text)
+- Random delay injection (hides timing patterns)
+- Onion routing (hides IP addresses)
+
+---
+
+### 12-Member Limit: Privacy-Enhancing Constraint
+
+**Design decision:** Enforce max 12 Circle members
+
+**Privacy rationale:**
+
+1. **Trust model**: Small group = easier to trust (less attack surface)
+2. **Key distribution**: Fewer devices = simpler E2EE key management
+3. **Metadata minimization**: Smaller social graph = less metadata leakage
+4. **UX**: Intimate friend group (not a social network)
+
+**Alternative rejected:** Unlimited Circle members
+- Would create large social graphs (more metadata)
+- Higher risk of malicious member (harder to vet 100 people)
+- Complex key distribution (O(n²) device pairs)
+
+---
+
 ## Identity & Pseudonymity
 
 ### DID Structure
@@ -378,9 +538,10 @@ let did = "did:buds:" + Base58.encode(pubkeyBytes.prefix(20))
 - **Important:** Relay still sees pseudonymous metadata (DIDs, device IDs, timestamps, connection IPs)
 
 **What IS linkable (mapping layer only):**
-- Firebase Auth: phone number → DID mapping (for discovery + sync, server-side only)
-- Circle members: You share your display name with them (local storage on their device)
-- Network layer: IP addresses may be in relay logs temporarily (abuse prevention)
+- **Firebase Auth**: Phone number → Firebase UID mapping (for phone verification only, Firebase server-side)
+- **Relay server**: Hashed phone → DID mapping (SHA-256, one-way, for friend discovery)
+- **Circle members**: Display names are local-only (each user chooses their own nicknames, never shared with relay)
+- **Network layer**: IP addresses may be in relay logs temporarily (abuse prevention, auto-deleted after 7 days)
 
 **Privacy note:** "Pseudonymous" ≠ "anonymous". The relay can build a social graph (DID A messages DIDs B, C, D) but cannot read message contents or definitively link DIDs to real identities without external data sources.
 

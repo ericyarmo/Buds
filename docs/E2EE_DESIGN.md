@@ -1,7 +1,7 @@
 # Buds End-to-End Encryption Design
 
-**Last Updated:** December 16, 2025
-**Version:** v0.1
+**Last Updated:** December 20, 2025
+**Version:** v0.1 (Phase 6 Ready)
 **Security Level:** Private Circle Sharing (12 max)
 
 ---
@@ -347,62 +347,86 @@ CREATE INDEX idx_messages_relay_sent_at ON messages(relay_sent_at_ms DESC);
 
 ### Problem: How to find all devices for a DID?
 
-**Solution: Device registry per Circle member**
+**Solution: Query relay's device registry**
 
-When someone accepts a Circle invite:
+Phase 6 uses a **privacy-preserving device discovery** model:
+- Circle rosters are local-only (relay never sees your friend list)
+- User adds friend by phone number
+- Client hashes phone and queries relay for DID
+- Client queries relay for all devices for that DID
+
+**Adding a Circle member flow:**
 
 ```swift
-func acceptInvite(_ inviteCode: String) async throws {
-    // 1. Accept invite
-    let invite = try await fetchInvite(inviteCode)
+func addCircleMember(phoneNumber: String, displayName: String) async throws {
+    // 1. Hash phone number (SHA-256)
+    let phoneHash = SHA256.hash(data: phoneNumber.data(using: .utf8)!)
+        .map { String(format: "%02x", $0) }
+        .joined()
 
-    // 2. Register your device(s)
-    try await registerDevice()
-
-    // 3. Fetch inviter's devices
-    let inviterDevices = try await fetchDevices(for: invite.inviter_did)
-
-    // 4. Store in local DB
-    for device in inviterDevices {
-        try await Database.shared.saveDevice(device)
+    // 2. Lookup DID from relay
+    let response = try await RelayClient.shared.lookupDID(phoneHash: phoneHash)
+    guard let did = response.did else {
+        throw CircleError.memberNotFound
     }
 
-    // 5. Broadcast your device to Circle
-    try await CircleManager.shared.broadcastDeviceToCircle()
+    // 3. Fetch all devices for DID
+    let devices = try await RelayClient.shared.getDevices(did: did)
+
+    // 4. Store member in local Circle (with real DID, status = active)
+    let member = CircleMember(
+        did: did,
+        displayName: displayName,  // Local nickname
+        phoneNumber: phoneNumber,  // Local display only
+        pubkeyX25519: devices.first?.pubkey_x25519 ?? "",  // Primary device pubkey
+        status: .active
+    )
+    try await Database.shared.saveCircleMember(member)
+
+    // 5. Store all devices locally (for multi-device E2EE)
+    for device in devices {
+        try await Database.shared.saveDevice(device)
+    }
 }
 ```
 
-**Relay API endpoint:**
+**Relay API endpoints:**
 
 ```
-GET /v1/devices?did=<did>&circle_id=<circle_id>
-Headers: Authorization: Bearer <device_auth_token>
+POST /api/lookup/did
+Body: { phoneHash: "sha256..." }
+Response: { did: "did:buds:abc123" }
+
+GET /api/devices/list?dids=did:buds:abc123,did:buds:xyz789
+Headers: Authorization: Bearer <firebase_id_token>
 Response: [Device]
 ```
 
 **Security requirements:**
-- **Authentication required**: Must include valid device auth token
-- **Authorization check**: Requester must be in the same Circle as the target DID
-- **Rate limiting**: Max 10 requests/minute per device to prevent DID enumeration
-- **Circle membership validation**: Server verifies both requester and target are in `circle_id`
+- **Authentication required**: Must include valid Firebase ID token
+- **Rate limiting**: Max 20 requests/minute per user to prevent DID enumeration
+- **Phone hash privacy**: Phone numbers are hashed client-side (relay never sees plaintext)
 
-**Database query:**
+**Database query (Cloudflare D1):**
 
 ```sql
--- First verify requester is in Circle
-SELECT 1 FROM circle_members
-WHERE circle_id = ? AND did = ?
+-- Lookup DID by hashed phone
+SELECT did FROM phone_to_did
+WHERE phone_hash = ?
 LIMIT 1;
 
--- Then fetch devices if authorized
-SELECT device_id, device_name, pubkey_x25519, pubkey_ed25519
+-- Fetch all devices for DID
+SELECT device_id, owner_did, device_name, pubkey_x25519, pubkey_ed25519
 FROM devices
 WHERE owner_did = ?
   AND status = 'active'
 ORDER BY last_seen_at DESC;
 ```
 
-**Privacy note:** Without authentication and Circle membership checks, this endpoint would allow DID enumeration attacks (scraping all device pubkeys for arbitrary DIDs).
+**Privacy note:**
+- Relay sees hashed phone numbers (not plaintext)
+- Relay sees which devices are queried (metadata leakage), but doesn't know *why* (no Circle roster on server)
+- DID enumeration is rate-limited but not prevented (public device registry by design)
 
 ---
 
