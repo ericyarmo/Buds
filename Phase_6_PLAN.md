@@ -99,7 +99,7 @@ import FirebaseAuth
 
 class RelayClient {
     static let shared = RelayClient()
-    private let baseURL = "https://buds-relay-dev.YOUR_SUBDOMAIN.workers.dev"
+    private let baseURL = "https://buds-relay-dev.getstreams.workers.dev"
 
     private init() {}
 
@@ -702,9 +702,8 @@ struct MemberRow: View {
 
 ### Checkpoint 1: Relay Running
 ```bash
-cd buds-relay
-curl http://localhost:8787/health
-# → {"status":"healthy"}
+curl https://buds-relay-dev.getstreams.workers.dev/health
+# → {"status":"healthy","version":"1.0.0","environment":"development"}
 ```
 
 ### Checkpoint 2: Device Registration
@@ -737,9 +736,9 @@ curl http://localhost:8787/health
 - App needs `Device` model in GRDB
 
 **Relay URL configuration:**
-- Update `RelayClient.baseURL` after deployment
-- Use `.workers.dev` domain for dev
-- Switch to custom domain for production
+- Production relay: `https://buds-relay-dev.getstreams.workers.dev`
+- Already configured in RelayClient.swift
+- Switch to custom domain for production (e.g., api.getbuds.app)
 
 **Authentication flow:**
 - Device registration requires Firebase Auth token
