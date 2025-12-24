@@ -70,6 +70,13 @@ actor IdentityManager {
 
     // MARK: - Device ID
 
+    /// Device ID property (for compatibility with Phase 6)
+    var deviceId: String {
+        get throws {
+            try getDeviceID()
+        }
+    }
+
     /// Get or generate stable device UUID
     func getDeviceID() throws -> String {
         if let existing = try loadStringFromKeychain(key: "device_id") {
@@ -80,6 +87,29 @@ actor IdentityManager {
         try saveStringToKeychain(key: "device_id", value: deviceID)
         print("✅ Generated device ID: \(deviceID)")
         return deviceID
+    }
+
+    // MARK: - DID Property (Convenience)
+
+    /// Current DID property (for compatibility with Phase 6)
+    var currentDID: String {
+        get throws {
+            try getDID()
+        }
+    }
+
+    // MARK: - Keypair Getters (Phase 6 compatibility)
+
+    /// Get X25519 keypair as tuple
+    func getX25519Keypair() throws -> (publicKey: Curve25519.KeyAgreement.PublicKey, privateKey: Curve25519.KeyAgreement.PrivateKey) {
+        let privateKey = try getEncryptionKeypair()
+        return (privateKey.publicKey, privateKey)
+    }
+
+    /// Get Ed25519 keypair as tuple
+    func getEd25519Keypair() throws -> (publicKey: Curve25519.Signing.PublicKey, privateKey: Curve25519.Signing.PrivateKey) {
+        let privateKey = try getSigningKeypair()
+        return (privateKey.publicKey, privateKey)
     }
 
     // MARK: - Keychain Helpers

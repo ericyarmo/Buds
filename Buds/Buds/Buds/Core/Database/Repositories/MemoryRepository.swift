@@ -7,6 +7,7 @@
 
 import Foundation
 import GRDB
+import Combine
 
 struct MemoryRepository {
     private let db = Database.shared

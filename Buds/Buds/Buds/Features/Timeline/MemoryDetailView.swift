@@ -14,6 +14,7 @@ struct MemoryDetailView: View {
     let memory: Memory
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: MemoryDetailViewModel
+    @State private var showingShareSheet = false
 
     init(memory: Memory) {
         self.memory = memory
@@ -89,6 +90,9 @@ struct MemoryDetailView: View {
                 }
             } message: {
                 Text("This action cannot be undone.")
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                ShareToCircleView(memoryCID: memory.receiptCID)
             }
         }
     }
@@ -273,11 +277,10 @@ struct MemoryDetailView: View {
 
     private var actionsSection: some View {
         VStack(spacing: BudsSpacing.s) {
-            // Share button (placeholder) - moved to top
+            // Share button - moved to top
             if !memory.isShared {
                 Button {
-                    // TODO: Share to Circle
-                    print("Share tapped")
+                    showingShareSheet = true
                 } label: {
                     HStack {
                         Image(systemName: "person.2.fill")

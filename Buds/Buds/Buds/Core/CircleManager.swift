@@ -54,20 +54,22 @@ class CircleManager: ObservableObject {
             throw CircleError.circleFull
         }
 
-        // TODO: Phase 6 - Look up DID via Firebase/Relay
-        // For now, create a placeholder
-        let placeholderDID = "did:buds:placeholder_\(UUID().uuidString.prefix(8))"
-        let placeholderPubkey = Data(repeating: 0, count: 32).base64EncodedString()
+        // Look up real DID from relay
+        let did = try await RelayClient.shared.lookupDID(phoneNumber: phoneNumber)
+        let devices = try await DeviceManager.shared.getDevices(for: [did])
+        guard let firstDevice = devices.first else {
+            throw CircleError.userNotRegistered
+        }
 
         let member = CircleMember(
             id: UUID().uuidString,
-            did: placeholderDID,
+            did: did,
             displayName: displayName,
             phoneNumber: phoneNumber,
             avatarCID: nil,
-            pubkeyX25519: placeholderPubkey,
-            status: .pending,
-            joinedAt: nil,
+            pubkeyX25519: firstDevice.pubkeyX25519,
+            status: .active,
+            joinedAt: Date(),
             invitedAt: Date(),
             removedAt: nil,
             createdAt: Date(),
@@ -80,7 +82,7 @@ class CircleManager: ObservableObject {
         }
 
         await loadMembers()
-        print("✅ Added Circle member: \(displayName)")
+        print("✅ Added Circle member: \(displayName) (DID: \(did))")
     }
 
     // MARK: - Remove Member
@@ -123,6 +125,8 @@ enum CircleError: Error, LocalizedError {
     case circleFull
     case memberNotFound
     case invalidPhoneNumber
+    case userNotFound
+    case userNotRegistered
 
     var errorDescription: String? {
         switch self {
@@ -132,6 +136,10 @@ enum CircleError: Error, LocalizedError {
             return "Circle member not found"
         case .invalidPhoneNumber:
             return "Invalid phone number"
+        case .userNotFound:
+            return "User not found on Buds"
+        case .userNotRegistered:
+            return "User hasn't registered with Buds yet"
         }
     }
 }

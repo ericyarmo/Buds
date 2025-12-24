@@ -7,6 +7,7 @@
 
 import GRDB
 import Foundation
+import Combine
 
 final class Database {
     static let shared = Database()

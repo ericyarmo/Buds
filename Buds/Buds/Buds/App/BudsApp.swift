@@ -76,6 +76,16 @@ struct BudsApp: App {
         WindowGroup {
             if authManager.isAuthenticated {
                 MainTabView()
+                    .task {
+                        // Register device on first authenticated launch
+                        if !DeviceManager.shared.isRegistered {
+                            do {
+                                try await DeviceManager.shared.registerDevice()
+                            } catch {
+                                print("❌ Device registration failed: \(error)")
+                            }
+                        }
+                    }
             } else {
                 PhoneAuthView()
             }

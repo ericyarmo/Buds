@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 
 /// User-facing model for a cannabis memory
 struct Memory: Identifiable, Codable {

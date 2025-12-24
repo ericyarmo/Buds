@@ -44,6 +44,12 @@
 		58FFD99C2EF71C2900C0A7DB /* MemberDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */; };
 		58FFD99D2EF71C2900C0A7DB /* CircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9992EF71C2900C0A7DB /* CircleView.swift */; };
 		58FFD99E2EF71C2900C0A7DB /* AddMemberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */; };
+		58FFD9A12EFA2DF900C0A7DB /* ShareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A02EFA2DF900C0A7DB /* ShareManager.swift */; };
+		58FFD9A22EFA2DF900C0A7DB /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD99F2EFA2DF900C0A7DB /* RelayClient.swift */; };
+		58FFD9A52EFA2E2B00C0A7DB /* DeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */; };
+		58FFD9A62EFA2E2B00C0A7DB /* E2EEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A42EFA2E2B00C0A7DB /* E2EEManager.swift */; };
+		58FFD9A82EFA2E4200C0A7DB /* EncryptedMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A72EFA2E4200C0A7DB /* EncryptedMessage.swift */; };
+		58FFD9AB2EFA2E6600C0A7DB /* ShareToCircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A92EFA2E6600C0A7DB /* ShareToCircleView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -102,6 +108,12 @@
 		58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMemberView.swift; sourceTree = "<group>"; };
 		58FFD9992EF71C2900C0A7DB /* CircleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleView.swift; sourceTree = "<group>"; };
 		58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberDetailView.swift; sourceTree = "<group>"; };
+		58FFD99F2EFA2DF900C0A7DB /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		58FFD9A02EFA2DF900C0A7DB /* ShareManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareManager.swift; sourceTree = "<group>"; };
+		58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceManager.swift; sourceTree = "<group>"; };
+		58FFD9A42EFA2E2B00C0A7DB /* E2EEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEManager.swift; sourceTree = "<group>"; };
+		58FFD9A72EFA2E4200C0A7DB /* EncryptedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptedMessage.swift; sourceTree = "<group>"; };
+		58FFD9A92EFA2E6600C0A7DB /* ShareToCircleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareToCircleView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -217,6 +229,11 @@
 		58FFD9382EF2900D00C0A7DB /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9A72EFA2E4200C0A7DB /* EncryptedMessage.swift */,
+				58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */,
+				58FFD9A42EFA2E2B00C0A7DB /* E2EEManager.swift */,
+				58FFD99F2EFA2DF900C0A7DB /* RelayClient.swift */,
+				58FFD9A02EFA2DF900C0A7DB /* ShareManager.swift */,
 				58FFD9962EF71C1100C0A7DB /* CircleManager.swift */,
 				58FFD9882EF4BB2800C0A7DB /* AuthManager.swift */,
 				58FFD9302EF2900D00C0A7DB /* ChaingeKernel */,
@@ -247,6 +264,7 @@
 		58FFD93E2EF2900D00C0A7DB /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9AA2EFA2E6600C0A7DB /* Share */,
 				58FFD99B2EF71C2900C0A7DB /* Circle */,
 				58FFD98E2EF4BBB600C0A7DB /* Profile */,
 				58FFD98B2EF4BBA300C0A7DB /* Auth */,
@@ -333,6 +351,14 @@
 				58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */,
 			);
 			path = Circle;
+			sourceTree = "<group>";
+		};
+		58FFD9AA2EFA2E6600C0A7DB /* Share */ = {
+			isa = PBXGroup;
+			children = (
+				58FFD9A92EFA2E6600C0A7DB /* ShareToCircleView.swift */,
+			);
+			path = Share;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -489,6 +515,8 @@
 				58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */,
 				58FFD9892EF4BB2800C0A7DB /* AuthManager.swift in Sources */,
 				58FFD9942EF71BFE00C0A7DB /* CircleMember.swift in Sources */,
+				58FFD9A12EFA2DF900C0A7DB /* ShareManager.swift in Sources */,
+				58FFD9A22EFA2DF900C0A7DB /* RelayClient.swift in Sources */,
 				58FFD9952EF71BFE00C0A7DB /* Device.swift in Sources */,
 				58FFD94E2EF2900D00C0A7DB /* CBORCanonical.swift in Sources */,
 				58FFD94F2EF2900D00C0A7DB /* CBOREncoder.swift in Sources */,
@@ -496,11 +524,14 @@
 				58FFD98C2EF4BBA300C0A7DB /* PhoneAuthView.swift in Sources */,
 				58FFD9512EF2900D00C0A7DB /* IdentityManager.swift in Sources */,
 				58FFD98F2EF4BBB600C0A7DB /* ProfileView.swift in Sources */,
+				58FFD9A82EFA2E4200C0A7DB /* EncryptedMessage.swift in Sources */,
 				58FFD9522EF2900D00C0A7DB /* ReceiptCanonicalizer.swift in Sources */,
 				58FFD9532EF2900D00C0A7DB /* ReceiptManager.swift in Sources */,
 				58FFD9542EF2900D00C0A7DB /* MemoryRepository.swift in Sources */,
 				58FFD9552EF2900D00C0A7DB /* Database.swift in Sources */,
 				58FFD9562EF2900D00C0A7DB /* Memory.swift in Sources */,
+				58FFD9A52EFA2E2B00C0A7DB /* DeviceManager.swift in Sources */,
+				58FFD9A62EFA2E2B00C0A7DB /* E2EEManager.swift in Sources */,
 				58FFD9572EF2900D00C0A7DB /* UCRHeader.swift in Sources */,
 				58FFD9782EF345DB00C0A7DB /* PhotoPicker.swift in Sources */,
 				58FFD9582EF2900D00C0A7DB /* CreateMemoryView.swift in Sources */,
@@ -514,6 +545,7 @@
 				58FFD99E2EF71C2900C0A7DB /* AddMemberView.swift in Sources */,
 				58FFD95D2EF2900D00C0A7DB /* Typography.swift in Sources */,
 				58FFD9822EF3470A00C0A7DB /* ImageCarousel.swift in Sources */,
+				58FFD9AB2EFA2E6600C0A7DB /* ShareToCircleView.swift in Sources */,
 				58FFD95E2EF2900D00C0A7DB /* EffectTag.swift in Sources */,
 				58FFD95F2EF2900D00C0A7DB /* MemoryCard.swift in Sources */,
 				58FFD9972EF71C1100C0A7DB /* CircleManager.swift in Sources */,

@@ -8,12 +8,12 @@ Built on ChaingeOS principles: receipts-first, local-first, privacy by default.
 
 ## Project Status
 
-🚀 **LIVE ON TESTFLIGHT** - Phase 4 Complete (December 19, 2025)
+🚀 **LIVE ON TESTFLIGHT** - Phase 6 Complete (December 23, 2025)
 
 **Current Build:** v1.0 (Build 1) - Approved for external testing (10k users)
 **Bundle ID:** `app.getbuds.buds`
-**Latest:** Firebase Auth + Profile working
-**Next Up:** Circle Mechanics (Phase 5) - See [PHASE_5_PLAN.md](./PHASE_5_PLAN.md)
+**Latest:** E2EE Circle Sharing with Cloudflare Workers relay ✅
+**Next Up:** Inbox Polling & Message Decryption
 
 ---
 
@@ -295,31 +295,67 @@ This is a private project (for now). Architecture by Claude (Anthropic) + Eric. 
 
 **See [`PHASE_4_COMPLETE.md`](./PHASE_4_COMPLETE.md) for full details.**
 
-### Phase 5: Circle Mechanics (NEXT UP)
+### Phase 5: Circle Mechanics ✅ (COMPLETE - Dec 20, 2025)
+- ✅ **Database Migration v3** - circles + devices tables
+- ✅ **CircleMember Model** - DID-based identity with status tracking
+- ✅ **Device Model** - Multi-device support schema
+- ✅ **CircleManager** - CRUD operations (add/remove/update members)
+- ✅ **CircleView** - Main Circle screen with empty state + member list
+- ✅ **AddMemberView** - Sheet for inviting friends (display name + phone)
+- ✅ **MemberDetailView** - Member details with inline editing + remove
+- ✅ **12-Member Limit** - Privacy-focused roster size enforced
+- ✅ **Dark Mode UI** - Black backgrounds across Timeline/Circle/Profile
+- ✅ **Placeholder DIDs** - Local-only (Phase 6 adds relay lookup)
 
-**Focus:** Add friends, local Circle management, UI foundation
+**See [`PHASE_5_COMPLETE.md`](./PHASE_5_COMPLETE.md) for full details.**
 
-**Tasks:**
-- [ ] Database migration v3 (circles + devices tables)
-- [ ] CircleMember + Device models
-- [ ] CircleManager for CRUD operations
-- [ ] CircleView UI (list, add, remove members)
-- [ ] Member detail view
-- [ ] Max 12 member limit enforcement
+### Phase 6: E2EE Sharing + Cloudflare Relay (NEXT UP - Critical)
 
-**See [`PHASE_5_PLAN.md`](./PHASE_5_PLAN.md) for implementation guide.**
+**⚠️ HIGH COMPLEXITY: E2EE streams for <12 people with offline ownership**
 
-### Phase 6: E2EE Sharing + Relay (PLANNED)
-- [ ] Relay server integration (DID lookup)
-- [ ] E2EE encryption (X25519 + AES-256-GCM)
-- [ ] Share memories with Circle
-- [ ] Message delivery via Cloudflare Workers
+**Focus:** Transform Circle from UI-only to functional E2EE sharing with Cloudflare Workers relay
+
+**Critical Components:**
+- [ ] **Cloudflare Workers** - TypeScript relay API (~440 lines)
+  - Device registration endpoint
+  - Phone → DID lookup (SHA-256 hashed)
+  - Message send/receive with D1 storage
+  - Firebase Auth token verification
+- [ ] **Device Management** - Multi-device registration + discovery
+  - Device ID generation on first launch
+  - X25519 + Ed25519 keypair storage
+  - Register with Cloudflare on sign-in
+- [ ] **E2EE Encryption** - Hybrid encryption primitives
+  - X25519 key agreement (ECDH)
+  - AES-256-GCM payload encryption
+  - Per-message ephemeral AES keys
+  - Multi-device key wrapping
+- [ ] **Share Flow** - Memory sharing UI + logic
+  - "Share to Circle" UI (member selection)
+  - Encrypt raw CBOR receipt
+  - POST to Workers relay
+  - Recipient inbox polling
+- [ ] **Offline Ownership** - Local-first data model
+  - Receipts stored locally (sender copy)
+  - Shared receipts encrypted at rest
+  - Sync conflict resolution strategy
+  - Receipt ownership verification
+
+**Architecture Challenges:**
+- Multi-device E2EE key distribution
+- Offline message queueing
+- Conflict-free replicated data (CRDTs?)
+- Key rotation without breaking shares
+- Device revocation handling
+
+**See [`PHASE_6_PLAN.md`](./PHASE_6_PLAN.md) for implementation guide.**
 
 ### Future Phases
-- [ ] Map view + fuzzy location privacy (Phase 7)
-- [ ] Agent integration - DeepSeek/Qwen (Phase 8)
-- [ ] Polish + TestFlight v2 (Phase 9)
+- [ ] **Phase 7:** Message Inbox + Push Notifications + Background Sync
+- [ ] **Phase 8:** Map View + Fuzzy Location Privacy
+- [ ] **Phase 9:** Agent Integration (DeepSeek/Qwen)
+- [ ] **Phase 10:** Polish + TestFlight v2
 
-**Current file count:** 29 Swift files + PHASE_5_PLAN.md = Ready for Circle mechanics
+**Current file count:** 35 Swift files + 6 docs = Ready for E2EE relay
 
-**December 19, 2025: Phase 4 complete! Firebase Auth + Profile working perfectly. 🎉🌿**
+**December 20, 2025: Phase 5 complete! Circle mechanics ready. Phase 6 next: E2EE sharing infrastructure. 🔐🌿**
