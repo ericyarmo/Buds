@@ -27,9 +27,11 @@ struct MemoryRepository {
                     lr.is_favorited,
                     lr.tags_json,
                     lr.local_notes,
-                    lr.image_cids
+                    lr.image_cids,
+                    rm.sender_did
                 FROM local_receipts lr
                 JOIN ucr_headers h ON lr.header_cid = h.cid
+                LEFT JOIN received_memories rm ON rm.header_cid = h.cid
                 WHERE h.receipt_type = ?
                 ORDER BY h.received_at DESC
                 """
@@ -53,9 +55,11 @@ struct MemoryRepository {
                     lr.is_favorited,
                     lr.tags_json,
                     lr.local_notes,
-                    lr.image_cids
+                    lr.image_cids,
+                    rm.sender_did
                 FROM local_receipts lr
                 JOIN ucr_headers h ON lr.header_cid = h.cid
+                LEFT JOIN received_memories rm ON rm.header_cid = h.cid
                 WHERE lr.uuid = ?
                 """
 
@@ -142,7 +146,8 @@ struct MemoryRepository {
             locationName: nil,
             isFavorited: false,
             isShared: false,
-            imageData: []
+            imageData: [],
+            senderDID: nil
         )
     }
 
@@ -257,6 +262,108 @@ struct MemoryRepository {
         }
     }
 
+    // MARK: - Shared Memories (Phase 7)
+
+    /// Check if a relay message has already been processed (idempotency protection)
+    func isMessageProcessed(relayMessageId: String) async throws -> Bool {
+        try await db.readAsync { db in
+            let count = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM received_memories WHERE relay_message_id = ?",
+                arguments: [relayMessageId]
+            ) ?? 0
+            return count > 0
+        }
+    }
+
+    /// Store a shared receipt from a Circle member (with raw CBOR from decryption)
+    func storeSharedReceipt(receiptCID: String, rawCBOR: Data, signature: String, senderDID: String, senderDeviceId: String, relayMessageId: String) async throws {
+        try await db.writeAsync { db in
+            // First check if this receipt already exists (might be our own shared receipt)
+            let exists = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM ucr_headers WHERE cid = ?",
+                arguments: [receiptCID]
+            ) ?? 0
+
+            if exists == 0 {
+                print("🗄️  [MemoryRepo] Decoding CBOR receipt...")
+
+                // Decode CBOR to extract all fields
+                let receipt = try ReceiptCanonicalizer.decodeReceipt(from: rawCBOR)
+                print("🗄️  [MemoryRepo] Receipt decoded - type: \(receipt.receiptType)")
+
+                let payload = try ReceiptCanonicalizer.decodeSessionPayload(from: receipt.payloadCBOR)
+                print("🗄️  [MemoryRepo] Payload decoded - product: \(payload.productName)")
+
+                // Encode payload to JSON for querying
+                let encoder = JSONEncoder()
+                encoder.keyEncodingStrategy = .convertToSnakeCase
+                let payloadJSON = try String(data: encoder.encode(payload), encoding: .utf8) ?? "{}"
+
+                // Insert into ucr_headers with full data
+                try db.execute(
+                    sql: """
+                        INSERT INTO ucr_headers (
+                            cid, did, device_id, parent_cid, root_cid, receipt_type,
+                            payload_json, signature, raw_cbor, received_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                    arguments: [
+                        receiptCID,
+                        senderDID,
+                        senderDeviceId,
+                        receipt.parentCID,
+                        receipt.rootCID,
+                        receipt.receiptType,
+                        payloadJSON,
+                        signature,
+                        rawCBOR,
+                        Date().timeIntervalSince1970
+                    ]
+                )
+                print("🗄️  [MemoryRepo] Inserted into ucr_headers")
+
+                // Create local_receipts entry for this shared receipt
+                let uuid = UUID()
+                let now = Date().timeIntervalSince1970
+                try db.execute(
+                    sql: """
+                        INSERT INTO local_receipts (
+                            uuid, header_cid, is_favorited, tags_json, local_notes,
+                            image_cids, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                    arguments: [uuid.uuidString, receiptCID, false, nil, nil, "[]", now, now]
+                )
+                print("🗄️  [MemoryRepo] Inserted into local_receipts")
+            }
+
+            // Create received_memories entry
+            try db.execute(
+                sql: """
+                    INSERT INTO received_memories (
+                        id, memory_cid, sender_did, header_cid, permissions,
+                        shared_at, received_at, relay_message_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(relay_message_id) DO NOTHING
+                    """,
+                arguments: [
+                    UUID().uuidString,
+                    receiptCID,
+                    senderDID,
+                    receiptCID,
+                    "view", // Default permission
+                    Date().timeIntervalSince1970,
+                    Date().timeIntervalSince1970,
+                    relayMessageId
+                ]
+            )
+
+            print("✅ Stored shared receipt \(receiptCID) from \(senderDID)")
+        }
+    }
+
     // MARK: - Helpers
 
     private func parseMemory(from row: Row, db: GRDB.Database) throws -> Memory? {
@@ -290,6 +397,9 @@ struct MemoryRepository {
 
         print("🗄️ MemoryRepo: Loaded \(imageData.count) images for memory")
 
+        // Check if this is a received memory (shared from Circle)
+        let senderDID = row["sender_did"] as? String
+
         return Memory(
             id: UUID(uuidString: row["uuid"])!,
             receiptCID: row["cid"],
@@ -308,8 +418,9 @@ struct MemoryRepository {
             hasLocation: payload.locationCID != nil,
             locationName: nil,  // TODO: Join with locations table
             isFavorited: (row["is_favorited"] as Int) == 1,
-            isShared: false,  // TODO: Check shared_memories table
-            imageData: imageData
+            isShared: senderDID != nil,  // Shared if received from someone
+            imageData: imageData,
+            senderDID: senderDID
         )
     }
 

@@ -111,3 +111,6 @@ extension UnsignedReceiptPreimage {
         )
     }
 }
+
+// Convenience typealias
+typealias CBOREncoder = CanonicalCBOREncoder

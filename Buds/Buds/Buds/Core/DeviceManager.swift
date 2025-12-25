@@ -21,7 +21,7 @@ class DeviceManager: ObservableObject {
         Task { await loadStatus() }
     }
 
-    func registerDevice() async throws {
+    func registerDevice(apnsToken: String? = nil) async throws {
         // Get phone number from Firebase Auth
         guard let phoneNumber = Auth.auth().currentUser?.phoneNumber else {
             throw DeviceError.notAuthenticated
@@ -34,6 +34,9 @@ class DeviceManager: ObservableObject {
         let ed25519 = try await identity.getEd25519Keypair()
         let name = UIDevice.current.name
 
+        // Use provided APNs token or load from UserDefaults
+        let token = apnsToken ?? UserDefaults.standard.string(forKey: "apns_token")
+
         do {
             try await RelayClient.shared.registerDevice(
                 deviceId: deviceId,
@@ -41,7 +44,8 @@ class DeviceManager: ObservableObject {
                 pubkeyX25519: x25519.publicKey.rawRepresentation.base64EncodedString(),
                 pubkeyEd25519: ed25519.publicKey.rawRepresentation.base64EncodedString(),
                 ownerDID: did,
-                phoneNumber: phoneNumber
+                phoneNumber: phoneNumber,
+                apnsToken: token
             )
         } catch let error as RelayError {
             // If already registered, that's fine - just mark as registered
@@ -69,6 +73,15 @@ class DeviceManager: ObservableObject {
         }
         isRegistered = true
         print("✅ Device registered: \(deviceId)")
+    }
+
+    func updateAPNsToken(_ token: String) async throws {
+        // Update local storage
+        UserDefaults.standard.set(token, forKey: "apns_token")
+
+        // Re-register device with updated APNs token
+        try await registerDevice(apnsToken: token)
+        print("✅ APNs token updated: \(token)")
     }
 
     func loadStatus() async {

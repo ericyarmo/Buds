@@ -53,6 +53,19 @@ class E2EEManager {
         combinedData.append(sealed.ciphertext)
         combinedData.append(sealed.tag)
 
+        // Fetch signature from database
+        let signature = try await Database.shared.readAsync { db in
+            try String.fetchOne(
+                db,
+                sql: "SELECT signature FROM ucr_headers WHERE cid = ?",
+                arguments: [receiptCID]
+            )
+        }
+
+        guard let signature = signature else {
+            throw E2EEError.signatureNotFound
+        }
+
         return EncryptedMessage(
             messageId: UUID().uuidString,
             receiptCID: receiptCID,
@@ -61,13 +74,14 @@ class E2EEManager {
             senderDID: senderDID,
             senderDeviceId: senderDevice,
             recipientDIDs: recipientDevices.map(\.ownerDID),
-            createdAt: Date()
+            createdAt: Date(),
+            signature: signature
         )
     }
 
     // MARK: - Decryption
 
-    /// Decrypt message from Circle
+    /// Decrypt message from Circle (returns raw CBOR)
     func decryptMessage(_ msg: EncryptedMessage) async throws -> Data {
         let identity = IdentityManager.shared
         let myDevice = try await identity.deviceId
@@ -98,6 +112,41 @@ class E2EEManager {
             using: aesKey,
             authenticating: msg.receiptCID.data(using: .utf8)!
         )
+    }
+
+    /// Decrypt and verify message with TOFU signature verification (Phase 7)
+    /// NOTE: This method is currently unused - InboxManager handles decryption directly
+    func decryptAndVerifyMessage(_ msg: EncryptedMessage) async throws -> UCRHeader {
+        // Decrypt to get raw CBOR
+        let rawCBOR = try await decryptMessage(msg)
+
+        // SECURITY: Get sender's device-specific Ed25519 public key (TOFU key pinning)
+        // DO NOT trust message.senderSigningPublicKey (relay could swap it)
+        guard let pinnedPubkey = try await CircleManager.shared.getPinnedEd25519PublicKey(
+            did: msg.senderDID,
+            deviceId: msg.senderDeviceId
+        ) else {
+            throw E2EEError.senderNotInCircle
+        }
+
+        // Verify signature over raw CBOR using pinned key
+        let senderPublicKey = try Curve25519.Signing.PublicKey(rawRepresentation: pinnedPubkey)
+        let isValid = try await ReceiptManager.shared.verifyReceipt(
+            cborData: rawCBOR,
+            signature: msg.signature,
+            publicKey: senderPublicKey
+        )
+        guard isValid else {
+            throw E2EEError.signatureVerificationFailed
+        }
+
+        // Decode CBOR to UCRHeader
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let receipt = try decoder.decode(UCRHeader.self, from: rawCBOR)
+
+        print("✅ Message decrypted and verified from \(msg.senderDID)")
+        return receipt
     }
 
     // MARK: - Key Wrapping (X25519 + HKDF + AES-GCM)
@@ -193,6 +242,9 @@ enum E2EEError: Error, LocalizedError {
     case invalidPayload
     case invalidPublicKey
     case deviceNotFound
+    case senderNotInCircle
+    case signatureVerificationFailed
+    case signatureNotFound
 
     var errorDescription: String? {
         switch self {
@@ -206,6 +258,12 @@ enum E2EEError: Error, LocalizedError {
             return "Invalid recipient public key"
         case .deviceNotFound:
             return "Sender device not found"
+        case .senderNotInCircle:
+            return "Sender not in your Circle"
+        case .signatureVerificationFailed:
+            return "Message signature verification failed"
+        case .signatureNotFound:
+            return "Receipt signature not found in database"
         }
     }
 }

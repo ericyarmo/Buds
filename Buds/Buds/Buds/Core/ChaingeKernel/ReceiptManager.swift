@@ -7,6 +7,7 @@
 
 import Foundation
 import GRDB
+import CryptoKit
 
 actor ReceiptManager {
     static let shared = ReceiptManager()
@@ -52,7 +53,7 @@ actor ReceiptManager {
         let canonicalBytes = try ReceiptCanonicalizer.canonicalCBOR(preimage)
 
         // Compute CID
-        let cid = CanonicalCBOREncoder.computeCID(from: canonicalBytes)
+        let cid = try computeCID(from: canonicalBytes)
 
         // If this is a new chain, update rootCID to point to self
         let finalRootCID = rootCID == "SELF" ? cid : rootCID
@@ -115,7 +116,39 @@ actor ReceiptManager {
         return true  // Placeholder
     }
 
+    /// Verify receipt signature with provided public key (Phase 7 - for received memories)
+    func verifyReceipt(cborData: Data, signature: String, publicKey: Curve25519.Signing.PublicKey) throws -> Bool {
+        print("🔐 [ReceiptManager] Verifying signature...")
+        print("🔐 [ReceiptManager] CBOR size: \(cborData.count) bytes")
+        print("🔐 [ReceiptManager] Signature: \(signature.prefix(20))...")
+
+        // Decode signature from base64
+        guard let signatureData = Data(base64Encoded: signature) else {
+            print("❌ [ReceiptManager] Invalid signature format (not base64)")
+            throw ReceiptError.invalidSignature
+        }
+
+        print("🔐 [ReceiptManager] Signature data size: \(signatureData.count) bytes (expected: 64)")
+
+        // Verify Ed25519 signature over canonical CBOR bytes
+        let isValid = publicKey.isValidSignature(signatureData, for: cborData)
+
+        if isValid {
+            print("✅ [ReceiptManager] Signature verification PASSED")
+        } else {
+            print("❌ [ReceiptManager] Signature verification FAILED")
+        }
+
+        return isValid
+    }
+
     // MARK: - Helpers
+
+    /// Compute CID from canonical CBOR bytes
+    /// Used for receipt creation and verification of received receipts
+    func computeCID(from canonicalBytes: Data) -> String {
+        return CanonicalCBOREncoder.computeCID(from: canonicalBytes)
+    }
 
     private func fetchRootCID(for cid: String) throws -> String {
         try db.read { db in

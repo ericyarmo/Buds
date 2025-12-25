@@ -61,6 +61,12 @@ struct TimelineView: View {
             .refreshable {
                 await viewModel.loadMemories()
             }
+            .onAppear {
+                viewModel.startInboxPolling()
+            }
+            .onDisappear {
+                viewModel.stopInboxPolling()
+            }
         }
     }
 
@@ -122,6 +128,18 @@ final class TimelineViewModel: ObservableObject {
     @Published var selectedMemory: Memory?
 
     private let repository = MemoryRepository()
+    private var inboxObserver: AnyCancellable?
+
+    init() {
+        // Listen for inbox updates (new shared memories)
+        inboxObserver = NotificationCenter.default
+            .publisher(for: .inboxUpdated)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.loadMemories()
+                }
+            }
+    }
 
     func loadMemories() async {
         isLoading = true
@@ -141,6 +159,20 @@ final class TimelineViewModel: ObservableObject {
             await loadMemories()  // Reload to get updated state
         } catch {
             print("❌ Failed to toggle favorite: \(error)")
+        }
+    }
+
+    func startInboxPolling() {
+        Task {
+            await InboxManager.shared.startForegroundPolling()
+            print("📬 Started inbox polling")
+        }
+    }
+
+    func stopInboxPolling() {
+        Task {
+            await InboxManager.shared.stopForegroundPolling()
+            print("📭 Stopped inbox polling")
         }
     }
 }

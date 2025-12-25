@@ -48,8 +48,10 @@
 		58FFD9A22EFA2DF900C0A7DB /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD99F2EFA2DF900C0A7DB /* RelayClient.swift */; };
 		58FFD9A52EFA2E2B00C0A7DB /* DeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */; };
 		58FFD9A62EFA2E2B00C0A7DB /* E2EEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A42EFA2E2B00C0A7DB /* E2EEManager.swift */; };
-		58FFD9A82EFA2E4200C0A7DB /* EncryptedMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A72EFA2E4200C0A7DB /* EncryptedMessage.swift */; };
 		58FFD9AB2EFA2E6600C0A7DB /* ShareToCircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A92EFA2E6600C0A7DB /* ShareToCircleView.swift */; };
+		58FFD9AD2EFC945600C0A7DB /* InboxManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */; };
+		58FFD9AF2EFCD9F200C0A7DB /* CBORDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9AE2EFCD9F200C0A7DB /* CBORDecoder.swift */; };
+		58FFD9B12EFCDA2400C0A7DB /* EncryptedMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B02EFCDA2400C0A7DB /* EncryptedMessage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -112,8 +114,10 @@
 		58FFD9A02EFA2DF900C0A7DB /* ShareManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareManager.swift; sourceTree = "<group>"; };
 		58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceManager.swift; sourceTree = "<group>"; };
 		58FFD9A42EFA2E2B00C0A7DB /* E2EEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEManager.swift; sourceTree = "<group>"; };
-		58FFD9A72EFA2E4200C0A7DB /* EncryptedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptedMessage.swift; sourceTree = "<group>"; };
 		58FFD9A92EFA2E6600C0A7DB /* ShareToCircleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareToCircleView.swift; sourceTree = "<group>"; };
+		58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxManager.swift; sourceTree = "<group>"; };
+		58FFD9AE2EFCD9F200C0A7DB /* CBORDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBORDecoder.swift; sourceTree = "<group>"; };
+		58FFD9B02EFCDA2400C0A7DB /* EncryptedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptedMessage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -188,6 +192,7 @@
 		58FFD9302EF2900D00C0A7DB /* ChaingeKernel */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9AE2EFCD9F200C0A7DB /* CBORDecoder.swift */,
 				58FFD92A2EF2900D00C0A7DB /* CBORCanonical.swift */,
 				58FFD92B2EF2900D00C0A7DB /* CBOREncoder.swift */,
 				58FFD92C2EF2900D00C0A7DB /* CBORValue.swift */,
@@ -218,6 +223,7 @@
 		58FFD9372EF2900D00C0A7DB /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9B02EFCDA2400C0A7DB /* EncryptedMessage.swift */,
 				58FFD9922EF71BFE00C0A7DB /* CircleMember.swift */,
 				58FFD9932EF71BFE00C0A7DB /* Device.swift */,
 				58FFD9352EF2900D00C0A7DB /* Memory.swift */,
@@ -229,7 +235,7 @@
 		58FFD9382EF2900D00C0A7DB /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				58FFD9A72EFA2E4200C0A7DB /* EncryptedMessage.swift */,
+				58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */,
 				58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */,
 				58FFD9A42EFA2E2B00C0A7DB /* E2EEManager.swift */,
 				58FFD99F2EFA2DF900C0A7DB /* RelayClient.swift */,
@@ -516,6 +522,7 @@
 				58FFD9892EF4BB2800C0A7DB /* AuthManager.swift in Sources */,
 				58FFD9942EF71BFE00C0A7DB /* CircleMember.swift in Sources */,
 				58FFD9A12EFA2DF900C0A7DB /* ShareManager.swift in Sources */,
+				58FFD9AD2EFC945600C0A7DB /* InboxManager.swift in Sources */,
 				58FFD9A22EFA2DF900C0A7DB /* RelayClient.swift in Sources */,
 				58FFD9952EF71BFE00C0A7DB /* Device.swift in Sources */,
 				58FFD94E2EF2900D00C0A7DB /* CBORCanonical.swift in Sources */,
@@ -524,13 +531,13 @@
 				58FFD98C2EF4BBA300C0A7DB /* PhoneAuthView.swift in Sources */,
 				58FFD9512EF2900D00C0A7DB /* IdentityManager.swift in Sources */,
 				58FFD98F2EF4BBB600C0A7DB /* ProfileView.swift in Sources */,
-				58FFD9A82EFA2E4200C0A7DB /* EncryptedMessage.swift in Sources */,
 				58FFD9522EF2900D00C0A7DB /* ReceiptCanonicalizer.swift in Sources */,
 				58FFD9532EF2900D00C0A7DB /* ReceiptManager.swift in Sources */,
 				58FFD9542EF2900D00C0A7DB /* MemoryRepository.swift in Sources */,
 				58FFD9552EF2900D00C0A7DB /* Database.swift in Sources */,
 				58FFD9562EF2900D00C0A7DB /* Memory.swift in Sources */,
 				58FFD9A52EFA2E2B00C0A7DB /* DeviceManager.swift in Sources */,
+				58FFD9B12EFCDA2400C0A7DB /* EncryptedMessage.swift in Sources */,
 				58FFD9A62EFA2E2B00C0A7DB /* E2EEManager.swift in Sources */,
 				58FFD9572EF2900D00C0A7DB /* UCRHeader.swift in Sources */,
 				58FFD9782EF345DB00C0A7DB /* PhotoPicker.swift in Sources */,
@@ -538,6 +545,7 @@
 				58FFD9592EF2900D00C0A7DB /* TimelineView.swift in Sources */,
 				58FFD95A2EF2900D00C0A7DB /* MainTabView.swift in Sources */,
 				58FFD97C2EF3462500C0A7DB /* MemoryDetailView.swift in Sources */,
+				58FFD9AF2EFCD9F200C0A7DB /* CBORDecoder.swift in Sources */,
 				58FFD95B2EF2900D00C0A7DB /* Colors.swift in Sources */,
 				58FFD95C2EF2900D00C0A7DB /* Spacing.swift in Sources */,
 				58FFD99C2EF71C2900C0A7DB /* MemberDetailView.swift in Sources */,

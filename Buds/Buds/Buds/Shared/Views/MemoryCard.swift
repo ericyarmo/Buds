@@ -6,11 +6,14 @@
 //
 
 import SwiftUI
+import GRDB
 
 struct MemoryCard: View {
     let memory: Memory
     let onTap: () -> Void
     let onToggleFavorite: () -> Void
+
+    @State private var senderName: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -121,12 +124,29 @@ struct MemoryCard: View {
 
                     // Share indicator
                     HStack(spacing: 4) {
-                        Image(systemName: memory.isShared ? "person.2.fill" : "lock.fill")
-                            .font(.caption2)
-                            .foregroundColor(memory.isShared ? .budsSuccess : .budsTextSecondary)
-                        Text(memory.isShared ? "Shared" : "Private")
-                            .font(.caption)
-                            .foregroundColor(.budsTextSecondary)
+                        if let senderDID = memory.senderDID {
+                            // Received from Circle member
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.budsAccent)
+                            if let name = senderName {
+                                Text("From \(name)")
+                                    .font(.caption)
+                                    .foregroundColor(.budsTextSecondary)
+                            } else {
+                                Text("Shared")
+                                    .font(.caption)
+                                    .foregroundColor(.budsTextSecondary)
+                            }
+                        } else {
+                            // Your own memory
+                            Image(systemName: memory.isShared ? "person.2.fill" : "lock.fill")
+                                .font(.caption2)
+                                .foregroundColor(memory.isShared ? .budsSuccess : .budsTextSecondary)
+                            Text(memory.isShared ? "Shared" : "Private")
+                                .font(.caption)
+                                .foregroundColor(.budsTextSecondary)
+                        }
                     }
                 }
             }
@@ -136,6 +156,29 @@ struct MemoryCard: View {
         .cornerRadius(BudsRadius.medium)
         .shadow(color: Color.budsPrimary.opacity(0.12), radius: 12, x: 0, y: 4)
         .onTapGesture(perform: onTap)
+        .task {
+            // Load sender name if this is a received memory
+            if let senderDID = memory.senderDID {
+                await loadSenderName(did: senderDID)
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func loadSenderName(did: String) async {
+        do {
+            let members = try await Database.shared.readAsync { db in
+                try CircleMember
+                    .filter(sql: "did = ?", arguments: [did])
+                    .fetchAll(db)
+            }
+            if let member = members.first {
+                senderName = member.displayName
+            }
+        } catch {
+            print("❌ Failed to load sender name: \(error)")
+        }
     }
 }
 

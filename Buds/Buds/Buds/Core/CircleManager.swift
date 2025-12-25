@@ -117,6 +117,58 @@ class CircleManager: ObservableObject {
         await loadMembers()
         print("✅ Updated Circle member: \(newName)")
     }
+
+    // MARK: - TOFU Key Pinning (Phase 7)
+
+    /// Get pinned Ed25519 public key for a Circle member (TOFU: Trust On First Use)
+    /// SECURITY: Returns locally-cached Ed25519 key from when member was added to Circle
+    /// This prevents the relay from swapping keys in transit
+    func getPinnedEd25519PublicKey(for did: String) async throws -> Data? {
+        let db = Database.shared
+
+        // Query devices table for this DID (stored when device was registered)
+        let device = try await db.readAsync { db in
+            try Device
+                .filter(Device.Columns.ownerDID == did)
+                .filter(Device.Columns.status == "active")
+                .order(Device.Columns.registeredAt.desc) // Most recent device
+                .fetchOne(db)
+        }
+
+        guard let device = device,
+              let pubkeyData = Data(base64Encoded: device.pubkeyEd25519) else {
+            print("❌ No pinned Ed25519 key for DID: \(did)")
+            return nil
+        }
+
+        print("🔐 TOFU: Using pinned Ed25519 key for \(did)")
+        return pubkeyData
+    }
+
+    /// Get pinned Ed25519 public key for a specific device (TOFU: Trust On First Use)
+    /// SECURITY: Returns device-specific Ed25519 key, preventing key confusion attacks
+    /// Use this method when you have both DID and deviceId from the message metadata
+    func getPinnedEd25519PublicKey(did: String, deviceId: String) async throws -> Data? {
+        let db = Database.shared
+
+        // Query devices table for this specific device
+        let device = try await db.readAsync { db in
+            try Device
+                .filter(Device.Columns.ownerDID == did)
+                .filter(Device.Columns.deviceId == deviceId)
+                .filter(Device.Columns.status == "active")
+                .fetchOne(db)
+        }
+
+        guard let device = device,
+              let pubkeyData = Data(base64Encoded: device.pubkeyEd25519) else {
+            print("❌ No pinned Ed25519 key for device: \(deviceId) (DID: \(did))")
+            return nil
+        }
+
+        print("🔐 TOFU: Using device-specific pinned Ed25519 key for \(deviceId)")
+        return pubkeyData
+    }
 }
 
 // MARK: - Errors

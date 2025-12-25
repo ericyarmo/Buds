@@ -42,6 +42,9 @@ struct Memory: Identifiable, Codable {
     var isShared: Bool
     var imageData: [Data]  // Array of up to 3 images
 
+    // Shared memory metadata (Phase 7)
+    var senderDID: String?  // If received from Circle member
+
     // MARK: - Computed Properties
 
     var relativeTimestamp: String {

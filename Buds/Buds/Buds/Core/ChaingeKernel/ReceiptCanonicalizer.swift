@@ -96,4 +96,175 @@ enum ReceiptCanonicalizer {
 
         return try enc.encode(.map(pairs))
     }
+
+    // MARK: - Decoding
+
+    /// Decode raw CBOR to extract receipt fields
+    static func decodeReceipt(from cborData: Data) throws -> (
+        did: String,
+        deviceId: String,
+        parentCID: String?,
+        rootCID: String,
+        receiptType: String,
+        payloadCBOR: Data
+    ) {
+        let decoder = CBORDecoder()
+        let value = try decoder.decode(cborData)
+
+        guard case .map(let pairs) = value else {
+            throw CBORDecodeError.invalidStructure
+        }
+
+        // Convert pairs to dictionary for easier lookup
+        var fields: [String: CBORValue] = [:]
+        for (key, val) in pairs {
+            guard case .text(let keyStr) = key else { continue }
+            fields[keyStr] = val
+        }
+
+        // Extract required fields
+        guard case .text(let did) = fields["did"] else {
+            throw CBORDecodeError.missingRequiredField("did")
+        }
+        guard case .text(let deviceId) = fields["deviceId"] else {
+            throw CBORDecodeError.missingRequiredField("deviceId")
+        }
+        guard case .text(let receiptType) = fields["receiptType"] else {
+            throw CBORDecodeError.missingRequiredField("receiptType")
+        }
+        guard case .bytes(let payloadCBOR) = fields["payload"] else {
+            throw CBORDecodeError.missingRequiredField("payload")
+        }
+        guard case .text(let rootCID) = fields["rootCID"] else {
+            throw CBORDecodeError.missingRequiredField("rootCID")
+        }
+
+        // Extract optional parentCID
+        let parentCID: String?
+        if case .text(let parent) = fields["parentCID"] {
+            parentCID = parent
+        } else {
+            parentCID = nil
+        }
+
+        return (did, deviceId, parentCID, rootCID, receiptType, payloadCBOR)
+    }
+
+    /// Decode SessionPayload from CBOR
+    static func decodeSessionPayload(from cborData: Data) throws -> SessionPayload {
+        let decoder = CBORDecoder()
+        let value = try decoder.decode(cborData)
+
+        guard case .map(let pairs) = value else {
+            throw CBORDecodeError.invalidStructure
+        }
+
+        // Convert pairs to dictionary
+        var fields: [String: CBORValue] = [:]
+        for (key, val) in pairs {
+            guard case .text(let keyStr) = key else { continue }
+            fields[keyStr] = val
+        }
+
+        // Extract required fields
+        guard case .text(let productName) = fields["product_name"] else {
+            throw CBORDecodeError.missingRequiredField("product_name")
+        }
+        guard case .text(let productType) = fields["product_type"] else {
+            throw CBORDecodeError.missingRequiredField("product_type")
+        }
+        guard case .int(let rating) = fields["rating"] else {
+            throw CBORDecodeError.missingRequiredField("rating")
+        }
+
+        // Extract optional claimed_time_ms
+        let claimedTimeMs: Int64?
+        if case .int(let time) = fields["claimed_time_ms"] {
+            claimedTimeMs = time
+        } else {
+            claimedTimeMs = nil
+        }
+
+        // Extract optional notes
+        let notes: String?
+        if case .text(let n) = fields["notes"] {
+            notes = n
+        } else {
+            notes = nil
+        }
+
+        // Extract optional brand
+        let brand: String?
+        if case .text(let b) = fields["brand"] {
+            brand = b
+        } else {
+            brand = nil
+        }
+
+        // Extract optional thc_percent (stored as basis points)
+        let thcPercent: Double?
+        if case .int(let thc) = fields["thc_percent"] {
+            thcPercent = Double(thc) / 100.0
+        } else {
+            thcPercent = nil
+        }
+
+        // Extract optional cbd_percent (stored as basis points)
+        let cbdPercent: Double?
+        if case .int(let cbd) = fields["cbd_percent"] {
+            cbdPercent = Double(cbd) / 100.0
+        } else {
+            cbdPercent = nil
+        }
+
+        // Extract optional amount_grams (stored as milligrams)
+        let amountGrams: Double?
+        if case .int(let amount) = fields["amount_grams"] {
+            amountGrams = Double(amount) / 1000.0
+        } else {
+            amountGrams = nil
+        }
+
+        // Extract effects array
+        let effects: [String]
+        if case .array(let effectsArray) = fields["effects"] {
+            effects = effectsArray.compactMap {
+                if case .text(let effect) = $0 { return effect }
+                return nil
+            }
+        } else {
+            effects = []
+        }
+
+        // Extract optional consumption_method
+        let consumptionMethod: String?
+        if case .text(let method) = fields["consumption_method"] {
+            consumptionMethod = method
+        } else {
+            consumptionMethod = nil
+        }
+
+        // Extract optional location_cid
+        let locationCID: String?
+        if case .text(let loc) = fields["location_cid"] {
+            locationCID = loc
+        } else {
+            locationCID = nil
+        }
+
+        return SessionPayload(
+            claimedTimeMs: claimedTimeMs,
+            productName: productName,
+            productType: productType,
+            rating: Int(rating),
+            notes: notes,
+            brand: brand,
+            thcPercent: thcPercent,
+            cbdPercent: cbdPercent,
+            amountGrams: amountGrams,
+            effects: effects,
+            consumptionMethod: consumptionMethod,
+            locationCID: locationCID
+        )
+    }
 }

@@ -8,6 +8,7 @@
 import SwiftUI
 import FirebaseCore
 import FirebaseAuth
+import BackgroundTasks
 
 // Configure Firebase BEFORE anything else (including @StateObject initialization)
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -16,22 +17,43 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         print("🔧 [DEBUG] AppDelegate didFinishLaunchingWithOptions called")
         FirebaseConfiguration.configureFirebase()
 
-        // Register for remote notifications (required for Phone Auth)
+        // Register for remote notifications (required for Phone Auth + silent push)
         print("🔧 [DEBUG] Registering for remote notifications...")
         application.registerForRemoteNotifications()
+
+        // Register background tasks for inbox polling
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: "app.getbuds.buds.inbox-poll",
+            using: nil
+        ) { task in
+            self.handleInboxPoll(task: task as! BGAppRefreshTask)
+        }
+
+        // Schedule initial background poll
+        scheduleBackgroundPoll()
 
         return true
     }
 
-    // MARK: - APNs Token Handling (Required for Phone Auth)
+    // MARK: - APNs Token Handling (Required for Phone Auth + Push Notifications)
 
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("🔧 [DEBUG] APNs token registered successfully")
-        print("🔧 [DEBUG] Device token: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
+        let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        print("📲 APNs token: \(token)")
 
-        // Forward to Firebase Auth
+        // Forward to Firebase Auth (required for phone verification)
         Auth.auth().setAPNSToken(deviceToken, type: .unknown)
+
+        // Upload to relay server for push notifications
+        Task {
+            do {
+                try await DeviceManager.shared.updateAPNsToken(token)
+                print("✅ APNs token uploaded to relay")
+            } catch {
+                print("❌ Failed to upload APNs token: \(error)")
+            }
+        }
     }
 
     func application(_ application: UIApplication,
@@ -43,7 +65,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification notification: [AnyHashable : Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        print("🔧 [DEBUG] Received remote notification")
+        print("📲 Silent push received")
 
         // Forward to Firebase Auth for phone verification
         if Auth.auth().canHandleNotification(notification) {
@@ -52,8 +74,63 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             return
         }
 
-        print("🔧 [DEBUG] Notification not handled by Firebase Auth")
+        // Check if this is an inbox notification
+        if notification["inbox"] != nil {
+            print("📬 Inbox notification received, triggering poll")
+
+            // Trigger immediate inbox poll
+            Task {
+                do {
+                    try await InboxManager.shared.pollInbox()
+                    completionHandler(.newData)
+                } catch {
+                    print("❌ Inbox poll after push failed: \(error)")
+                    completionHandler(.failed)
+                }
+            }
+            return
+        }
+
+        print("🔧 [DEBUG] Notification not handled")
         completionHandler(.noData)
+    }
+
+    // MARK: - Background Task Handling
+
+    func handleInboxPoll(task: BGAppRefreshTask) {
+        task.expirationHandler = {
+            task.setTaskCompleted(success: false)
+        }
+
+        Task {
+            do {
+                try await InboxManager.shared.pollInbox()
+                task.setTaskCompleted(success: true)
+            } catch {
+                print("❌ Background inbox poll failed: \(error)")
+                task.setTaskCompleted(success: false)
+            }
+
+            // Schedule next background poll
+            scheduleBackgroundPoll()
+        }
+    }
+
+    func scheduleBackgroundPoll() {
+        let request = BGAppRefreshTaskRequest(identifier: "app.getbuds.buds.inbox-poll")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes
+
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("✅ Background poll scheduled")
+        } catch {
+            print("❌ Failed to schedule background poll: \(error)")
+        }
+    }
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        // Re-schedule background poll when app backgrounds
+        scheduleBackgroundPoll()
     }
 }
 

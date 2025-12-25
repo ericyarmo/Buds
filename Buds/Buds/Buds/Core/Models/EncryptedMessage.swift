@@ -16,6 +16,7 @@ struct EncryptedMessage: Codable {
     let senderDeviceId: String
     let recipientDIDs: [String]
     let createdAt: Date
+    let signature: String  // Ed25519 signature for verification
 
     enum CodingKeys: String, CodingKey {
         case messageId = "message_id"
@@ -26,5 +27,6 @@ struct EncryptedMessage: Codable {
         case senderDeviceId = "sender_device_id"
         case recipientDIDs = "recipient_dids"
         case createdAt = "created_at"
+        case signature
     }
 }

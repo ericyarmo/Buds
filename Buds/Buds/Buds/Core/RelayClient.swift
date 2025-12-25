@@ -11,7 +11,7 @@ import CryptoKit
 
 class RelayClient {
     static let shared = RelayClient()
-    private let baseURL = "https://buds-relay-dev.getstreams.workers.dev"
+    private let baseURL = "https://buds-relay.getstreams.workers.dev"
 
     private init() {}
 
@@ -20,12 +20,16 @@ class RelayClient {
             throw RelayError.notAuthenticated
         }
         let token = try await user.getIDToken()
+
+        // DEBUG: Print token for testing (remove in production)
+        print("🔐 Firebase ID Token: \(token)")
+
         return ["Authorization": "Bearer \(token)"]
     }
 
     // MARK: - Device Registration
 
-    func registerDevice(deviceId: String, deviceName: String, pubkeyX25519: String, pubkeyEd25519: String, ownerDID: String, phoneNumber: String) async throws {
+    func registerDevice(deviceId: String, deviceName: String, pubkeyX25519: String, pubkeyEd25519: String, ownerDID: String, phoneNumber: String, apnsToken: String? = nil) async throws {
         let headers = try await authHeader()
         let url = URL(string: "\(baseURL)/api/devices/register")!
         var req = URLRequest(url: url)
@@ -36,7 +40,7 @@ class RelayClient {
         // Hash the phone number (SHA-256)
         let phoneHash = try hashPhoneNumber(phoneNumber)
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "device_id": deviceId,
             "device_name": deviceName,
             "owner_did": ownerDID,
@@ -44,6 +48,12 @@ class RelayClient {
             "pubkey_x25519": pubkeyX25519,
             "pubkey_ed25519": pubkeyEd25519
         ]
+
+        // Add APNs token if provided
+        if let apnsToken = apnsToken {
+            body["apns_token"] = apnsToken
+        }
+
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, res) = try await URLSession.shared.data(for: req)
@@ -223,7 +233,8 @@ class RelayClient {
                   let keys = dict["wrapped_keys"] as? [String: String],
                   let senderDID = dict["sender_did"] as? String,
                   let senderDevice = dict["sender_device_id"] as? String,
-                  let createdMs = dict["created_at"] as? Int64
+                  let createdMs = dict["created_at"] as? Int64,
+                  let signature = dict["signature"] as? String
             else {
                 throw RelayError.invalidResponse
             }
@@ -236,9 +247,28 @@ class RelayClient {
                 senderDID: senderDID,
                 senderDeviceId: senderDevice,
                 recipientDIDs: [],
-                createdAt: Date(timeIntervalSince1970: Double(createdMs) / 1000)
+                createdAt: Date(timeIntervalSince1970: Double(createdMs) / 1000),
+                signature: signature
             )
         }
+    }
+
+    // Delete message after processing
+    func deleteMessage(messageId: String) async throws {
+        let headers = try await authHeader()
+        let url = URL(string: "\(baseURL)/api/messages/\(messageId)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+
+        let (_, res) = try await URLSession.shared.data(for: req)
+        let statusCode = (res as? HTTPURLResponse)?.statusCode ?? 0
+
+        guard statusCode == 200 || statusCode == 204 else {
+            throw RelayError.serverError
+        }
+
+        print("✅ Message \(messageId) deleted from relay")
     }
 }
 

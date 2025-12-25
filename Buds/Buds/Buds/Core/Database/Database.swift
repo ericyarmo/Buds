@@ -65,6 +65,11 @@ final class Database {
             try migrateToCircles(db)
         }
 
+        // Migration v4: Received memories (Phase 7)
+        migrator.registerMigration("v4_received_memories") { db in
+            try migrateToReceivedMemories(db)
+        }
+
         return migrator
     }
 
@@ -320,4 +325,38 @@ private func migrateToCircles(_ db: GRDB.Database) throws {
     """)
 
     print("✅ Migration v3 complete: Circle tables created")
+}
+
+// MARK: - Migration v4 (Phase 7)
+
+private func migrateToReceivedMemories(_ db: GRDB.Database) throws {
+    print("📦 Running migration v4: Received memories")
+
+    // Create received_memories table
+    try db.execute(sql: """
+        CREATE TABLE received_memories (
+            id TEXT PRIMARY KEY NOT NULL,
+            memory_cid TEXT NOT NULL,
+            sender_did TEXT NOT NULL,
+            header_cid TEXT NOT NULL,
+            permissions TEXT NOT NULL,
+            shared_at REAL NOT NULL,
+            received_at REAL NOT NULL,
+            relay_message_id TEXT NOT NULL UNIQUE,
+            FOREIGN KEY (header_cid) REFERENCES ucr_headers(cid) ON DELETE CASCADE
+        )
+    """)
+
+    // Create indexes for received_memories
+    try db.execute(sql: """
+        CREATE INDEX idx_received_memories_sender ON received_memories(sender_did)
+    """)
+    try db.execute(sql: """
+        CREATE INDEX idx_received_memories_received ON received_memories(received_at DESC)
+    """)
+    try db.execute(sql: """
+        CREATE INDEX idx_received_memories_relay_msg ON received_memories(relay_message_id)
+    """)
+
+    print("✅ Migration v4 complete: Received memories table created")
 }
