@@ -60,6 +60,27 @@ class JarManager: ObservableObject {
         print("✅ Deleted jar: \(id)")
     }
 
+    /// Ensure Solo jar exists (for fresh installs)
+    /// CRITICAL: Must be called after auth to avoid crash on fresh install
+    func ensureSoloJarExists() async throws {
+        let jars = try await JarRepository.shared.getAllJars()
+        guard !jars.contains(where: { $0.name == "Solo" }) else {
+            print("✅ Solo jar already exists")
+            return
+        }
+
+        let currentDID = try await IdentityManager.shared.currentDID
+
+        _ = try await JarRepository.shared.createJar(
+            name: "Solo",
+            description: "Your private buds",
+            ownerDID: currentDID
+        )
+
+        await loadJars()
+        print("✅ Created Solo jar for fresh install")
+    }
+
     // MARK: - Member Operations
 
     func getMembers(jarID: String) async throws -> [JarMember] {
@@ -72,13 +93,33 @@ class JarManager: ObservableObject {
             throw JarError.jarFull
         }
 
-        // Look up real DID from relay
+        // 1. Look up real DID from relay
         let did = try await RelayClient.shared.lookupDID(phoneNumber: phoneNumber)
+
+        // 2. Get ALL devices for this DID (not just first one)
         let devices = try await DeviceManager.shared.getDevices(for: [did])
-        guard let firstDevice = devices.first else {
+        guard !devices.isEmpty else {
             throw JarError.userNotRegistered
         }
 
+        // 3. Store ALL devices in local devices table (TOFU key pinning)
+        // CRITICAL: This prevents "senderDeviceNotPinned" errors when receiving messages
+        for device in devices {
+            try await Database.shared.writeAsync { db in
+                // Check if device already exists
+                let exists = try Device
+                    .filter(Device.Columns.deviceId == device.deviceId)
+                    .fetchCount(db) > 0
+
+                if !exists {
+                    try device.insert(db)
+                    print("🔐 Pinned device \(device.deviceId) for \(did)")
+                }
+            }
+        }
+
+        // 4. Add member to jar (use first device's X25519 key for jar_members table)
+        let firstDevice = devices[0]
         try await JarRepository.shared.addMember(
             jarID: jarID,
             memberDID: did,
@@ -87,7 +128,7 @@ class JarManager: ObservableObject {
             pubkeyX25519: firstDevice.pubkeyX25519
         )
 
-        print("✅ Added jar member: \(displayName) to jar \(jarID)")
+        print("✅ Added jar member: \(displayName) to jar \(jarID) with \(devices.count) devices pinned")
     }
 
     func removeMember(jarID: String, memberDID: String) async throws {

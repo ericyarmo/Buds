@@ -162,6 +162,13 @@ struct BudsApp: App {
                                 print("❌ Device registration failed: \(error)")
                             }
                         }
+
+                        // Ensure Solo jar exists (critical for fresh installs)
+                        do {
+                            try await JarManager.shared.ensureSoloJarExists()
+                        } catch {
+                            print("❌ Failed to ensure Solo jar: \(error)")
+                        }
                     }
             } else {
                 PhoneAuthView()

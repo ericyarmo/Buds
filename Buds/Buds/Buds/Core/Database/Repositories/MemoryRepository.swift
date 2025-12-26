@@ -357,6 +357,17 @@ struct MemoryRepository {
                 )
                 print("🗄️  [MemoryRepo] Inserted into ucr_headers")
 
+                // Infer jar from sender membership (which jar is sender a member of?)
+                let jarID = try String.fetchOne(
+                    db,
+                    sql: """
+                        SELECT jar_id FROM jar_members
+                        WHERE member_did = ? AND status = 'active'
+                        LIMIT 1
+                        """,
+                    arguments: [senderDID]
+                ) ?? "solo"  // Fallback to solo if sender not in any jar
+
                 // Create local_receipts entry for this shared receipt
                 let uuid = UUID()
                 let now = Date().timeIntervalSince1970
@@ -367,9 +378,9 @@ struct MemoryRepository {
                             image_cids, jar_id, sender_did, created_at, updated_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                    arguments: [uuid.uuidString, receiptCID, false, nil, nil, "[]", "solo", senderDID, now, now]
+                    arguments: [uuid.uuidString, receiptCID, false, nil, nil, "[]", jarID, senderDID, now, now]
                 )
-                print("🗄️  [MemoryRepo] Inserted into local_receipts")
+                print("🗄️  [MemoryRepo] Inserted into local_receipts with jar_id: \(jarID)")
             }
 
             // Create received_memories entry

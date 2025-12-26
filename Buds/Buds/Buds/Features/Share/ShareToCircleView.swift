@@ -2,7 +2,7 @@
 //  ShareToCircleView.swift
 //  Buds
 //
-//  Phase 6: Share memory to Circle with E2EE
+//  Phase 9: Share memory to jar members with E2EE
 //
 
 import SwiftUI
@@ -12,10 +12,12 @@ struct ShareToCircleView: View {
     @StateObject private var shareManager = ShareManager.shared
 
     let memoryCID: String
+    let jarID: String  // NEW: Current jar context
 
     @State private var selectedDIDs: Set<String> = []
     @State private var error: String?
-    @State private var members: [CircleMember] = []  // TODO Phase 9: Update to use JarMembers
+    @State private var members: [JarMember] = []  // Updated to JarMember
+    @State private var isLoading = false
 
     private var allSelected: Bool {
         !members.isEmpty && selectedDIDs.count == members.count
@@ -30,7 +32,7 @@ struct ShareToCircleView: View {
                         .font(.system(size: 50))
                         .foregroundColor(.budsPrimary)
 
-                    Text("Share to Circle")
+                    Text("Share to Jar")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
 
@@ -43,23 +45,39 @@ struct ShareToCircleView: View {
                 .padding(.top, 40)
                 .padding(.bottom, 24)
 
-                // Member list
-                ScrollView {
+                // Loading or member list
+                if isLoading {
+                    ProgressView()
+                        .tint(.budsPrimary)
+                        .padding()
+                } else if members.isEmpty {
                     VStack(spacing: 12) {
-                        ForEach(members, id: \.id) { member in
-                            MemberRow(
-                                member: member,
-                                isSelected: selectedDIDs.contains(member.did)
-                            ) {
-                                if selectedDIDs.contains(member.did) {
-                                    selectedDIDs.remove(member.did)
-                                } else {
-                                    selectedDIDs.insert(member.did)
+                        Text("No members in this jar")
+                            .font(.budsBody)
+                            .foregroundColor(.budsTextSecondary)
+                        Text("Add members to share with them")
+                            .font(.budsCaption)
+                            .foregroundColor(.budsTextSecondary)
+                    }
+                    .padding()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            ForEach(members) { member in
+                                JarMemberRow(
+                                    member: member,
+                                    isSelected: selectedDIDs.contains(member.memberDID)
+                                ) {
+                                    if selectedDIDs.contains(member.memberDID) {
+                                        selectedDIDs.remove(member.memberDID)
+                                    } else {
+                                        selectedDIDs.insert(member.memberDID)
+                                    }
                                 }
                             }
                         }
+                        .padding()
                     }
-                    .padding()
                 }
 
                 // Error message
@@ -102,8 +120,25 @@ struct ShareToCircleView: View {
                         toggleSelectAll()
                     }
                     .foregroundColor(.budsPrimary)
+                    .disabled(members.isEmpty)
                 }
             }
+            .task {
+                await loadMembers()
+            }
+        }
+    }
+
+    private func loadMembers() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            members = try await JarRepository.shared.getMembers(jarID: jarID)
+            print("✅ Loaded \(members.count) members for jar \(jarID)")
+        } catch {
+            self.error = "Failed to load members: \(error.localizedDescription)"
+            print("❌ Failed to load members: \(error)")
         }
     }
 
@@ -125,15 +160,15 @@ struct ShareToCircleView: View {
             selectedDIDs.removeAll()
         } else {
             // Select all
-            selectedDIDs = Set(members.map(\.did))
+            selectedDIDs = Set(members.map(\.memberDID))
         }
     }
 }
 
-// MARK: - Member Row
+// MARK: - Jar Member Row
 
-struct MemberRow: View {
-    let member: CircleMember
+struct JarMemberRow: View {
+    let member: JarMember
     let isSelected: Bool
     let onToggle: () -> Void
 
@@ -166,10 +201,4 @@ struct MemberRow: View {
         .cornerRadius(12)
         .onTapGesture { onToggle() }
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    ShareToCircleView(memoryCID: "bafyreitest123")
 }

@@ -2,14 +2,16 @@
 //  AddMemberView.swift
 //  Buds
 //
-//  Add friend to Circle
+//  Add member to a specific jar (Phase 9)
 //
 
 import SwiftUI
 
 struct AddMemberView: View {
+    let jarID: String  // Which jar to add member to
+
     @Environment(\.dismiss) var dismiss
-    // TODO Phase 9: Update to use JarManager
+    @StateObject private var jarManager = JarManager.shared
 
     @State private var phoneNumber = ""
     @State private var displayName = ""
@@ -26,11 +28,11 @@ struct AddMemberView: View {
                             .font(.system(size: 60))
                             .foregroundColor(.budsPrimary)
 
-                        Text("Add Friend to Circle")
+                        Text("Add Friend to Jar")
                             .font(.budsTitle)
                             .foregroundColor(.white)
 
-                        Text("They'll be able to see memories you share with your Circle.")
+                        Text("They'll be able to see buds you share in this jar.")
                             .font(.budsBody)
                             .foregroundColor(.budsTextSecondary)
                             .multilineTextAlignment(.center)
@@ -97,7 +99,7 @@ struct AddMemberView: View {
                                 .progressViewStyle(.circular)
                                 .tint(.white)
                         } else {
-                            Text("Add to Circle")
+                            Text("Add Member")
                                 .font(.budsBodyBold)
                                 .foregroundColor(.white)
                         }
@@ -135,28 +137,22 @@ struct AddMemberView: View {
         errorMessage = nil
         isAdding = true
 
-        // TODO Phase 9: Update to use JarManager
-        errorMessage = "Circle features will be updated in Phase 9"
-        isAdding = false
-
-        /*
         Task {
             do {
+                // Format phone number (add +1 prefix, remove non-digits)
+                let formattedPhone = "+1\(phoneNumber.filter { $0.isNumber })"
+
                 try await jarManager.addMember(
-                    jarID: "solo",
-                    phoneNumber: "+1\(phoneNumber.filter { $0.isNumber })",
+                    jarID: jarID,
+                    phoneNumber: formattedPhone,
                     displayName: displayName
                 )
+
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription
+                isAdding = false
             }
-            isAdding = false
         }
-        */
     }
-}
-
-#Preview {
-    AddMemberView()
 }

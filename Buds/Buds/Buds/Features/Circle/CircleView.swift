@@ -2,44 +2,50 @@
 //  CircleView.swift
 //  Buds
 //
-//  Circle (friends) management screen
+//  Jar management screen (Phase 9: Rebuilt as jar list)
 //
 
 import SwiftUI
 
 struct CircleView: View {
-    // TODO Phase 9: Update to use JarManager and Jars
-    @State private var showingAddMember = false
-    @State private var showingMemberDetail: CircleMember?
-    @State private var members: [CircleMember] = []
+    @StateObject private var jarManager = JarManager.shared
+    @State private var showingCreateJar = false
+    @State private var selectedJar: Jar?
 
     var body: some View {
         NavigationView {
             ZStack {
-                if members.isEmpty {
+                Color.black.ignoresSafeArea()
+
+                if jarManager.isLoading {
+                    ProgressView("Loading jars...")
+                        .tint(.budsPrimary)
+                } else if jarManager.jars.isEmpty {
                     emptyState
                 } else {
-                    membersList
+                    jarList
                 }
             }
-            .navigationTitle("Circle")
+            .navigationTitle("Jars")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showingAddMember = true
-                    }) {
-                        Image(systemName: "person.badge.plus")
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingCreateJar = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
                             .foregroundColor(.budsPrimary)
                     }
-                    .disabled(members.count >= 12)
                 }
             }
-            .sheet(isPresented: $showingAddMember) {
-                AddMemberView()
+            .sheet(isPresented: $showingCreateJar, onDismiss: {
+                Task { await jarManager.loadJars() }
+            }) {
+                CreateJarView()
             }
-            .sheet(item: $showingMemberDetail) { member in
-                MemberDetailView(member: member)
+            .task {
+                await jarManager.loadJars()
             }
         }
     }
@@ -48,28 +54,28 @@ struct CircleView: View {
 
     private var emptyState: some View {
         VStack(spacing: 24) {
-            Image(systemName: "person.2.circle")
+            Image(systemName: "square.stack.3d.up")
                 .font(.system(size: 80))
                 .foregroundColor(.budsPrimary.opacity(0.3))
 
             VStack(spacing: 12) {
-                Text("Your Circle is Empty")
+                Text("No Jars Yet")
                     .font(.budsTitle)
                     .foregroundColor(.white)
 
-                Text("Add friends to share your cannabis memories privately. Max 12 members.")
+                Text("Create jars to organize your buds and share with specific groups.")
                     .font(.budsBody)
                     .foregroundColor(.budsTextSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
 
-            Button(action: {
-                showingAddMember = true
-            }) {
+            Button {
+                showingCreateJar = true
+            } label: {
                 HStack {
-                    Image(systemName: "person.badge.plus")
-                    Text("Add Friend")
+                    Image(systemName: "plus.circle")
+                    Text("Create Jar")
                 }
                 .font(.budsBodyBold)
                 .foregroundColor(.white)
@@ -82,108 +88,19 @@ struct CircleView: View {
         .padding()
     }
 
-    // MARK: - Members List
+    // MARK: - Jar List
 
-    private var membersList: some View {
+    private var jarList: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Circle capacity indicator
-                capacityIndicator
-
-                // Member cards
-                ForEach(members, id: \.id) { member in
-                    MemberCard(member: member)
-                        .onTapGesture {
-                            showingMemberDetail = member
-                        }
+            LazyVStack(spacing: 16) {
+                ForEach(jarManager.jars) { jar in
+                    NavigationLink(destination: JarDetailView(jar: jar)) {
+                        JarCard(jar: jar)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding()
-        }
-        .background(Color.black)
-    }
-
-    private var capacityIndicator: some View {
-        HStack {
-            Image(systemName: "person.2.fill")
-                .foregroundColor(.budsPrimary)
-
-            Text("\(members.count) / 12 members")
-                .font(.budsCaption)
-                .foregroundColor(.budsTextSecondary)
-
-            Spacer()
-        }
-        .padding(.horizontal, 4)
-    }
-}
-
-// MARK: - Member Card Component
-
-struct MemberCard: View {
-    let member: CircleMember
-
-    var body: some View {
-        HStack(spacing: 16) {
-            // Avatar
-            Circle()
-                .fill(Color.budsPrimary.opacity(0.2))
-                .frame(width: 50, height: 50)
-                .overlay(
-                    Text(member.displayName.prefix(1).uppercased())
-                        .font(.budsHeadline)
-                        .foregroundColor(.budsPrimary)
-                )
-
-            // Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(member.displayName)
-                    .font(.budsBodyBold)
-                    .foregroundColor(.black)
-
-                HStack(spacing: 8) {
-                    StatusBadge(status: member.status)
-
-                    if let phone = member.phoneNumber {
-                        Text(phone)
-                            .font(.budsCaption)
-                            .foregroundColor(.budsTextSecondary)
-                    }
-                }
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .foregroundColor(.budsTextSecondary)
-                .font(.system(size: 14))
-        }
-        .padding()
-        .background(Color.budsCard)
-        .cornerRadius(12)
-    }
-}
-
-// MARK: - Status Badge Component
-
-struct StatusBadge: View {
-    let status: CircleMember.CircleStatus
-
-    var body: some View {
-        Text(status.rawValue.capitalized)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(statusColor)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(statusColor.opacity(0.2))
-            .cornerRadius(6)
-    }
-
-    private var statusColor: Color {
-        switch status {
-        case .active: return .budsSuccess
-        case .pending: return Color.orange
-        case .removed: return .budsTextSecondary
         }
     }
 }

@@ -846,17 +846,6 @@ class AIBudsManager {
 
 ---
 
-### Risk 2: User Confusion (Circle → Jar Terminology)
-
-**Symptom**: Users ask "Where did my Circle go?"
-
-**Mitigation**:
-- Show migration banner: "Circles are now Jars!"
-- Tutorial on first launch (swipe through 3 screens)
-- In-app tooltip: "Your Circle is now the 'Solo' jar"
-
----
-
 ### Risk 3: App Store Rejection (Cannabis Content)
 
 **Symptom**: Apple rejects app for promoting illegal activity

@@ -2,196 +2,102 @@
 //  MemberDetailView.swift
 //  Buds
 //
-//  Circle member detail screen
+//  Jar member detail with remove action (Phase 9)
 //
 
 import SwiftUI
 
 struct MemberDetailView: View {
+    let jar: Jar
+    let member: JarMember
+
     @Environment(\.dismiss) var dismiss
-    // TODO Phase 9: Update to use JarManager
+    @StateObject private var jarManager = JarManager.shared
 
-    let member: CircleMember
-    @State private var showingRemoveAlert = false
-    @State private var isEditingName = false
-    @State private var editedName: String
-
-    init(member: CircleMember) {
-        self.member = member
-        _editedName = State(initialValue: member.displayName)
-    }
+    @State private var showingRemoveConfirmation = false
+    @State private var isRemoving = false
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Avatar
-                    Circle()
-                        .fill(Color.budsPrimary.opacity(0.2))
-                        .frame(width: 100, height: 100)
-                        .overlay(
-                            Text(member.displayName.prefix(1).uppercased())
-                                .font(.system(size: 50))
-                                .foregroundColor(.budsPrimary)
-                        )
-                        .padding(.top, 40)
+        ZStack {
+            Color.black.ignoresSafeArea()
 
-                    // Name
-                    if isEditingName {
-                        HStack {
-                            TextField("Display Name", text: $editedName)
-                                .font(.budsTitle)
-                                .foregroundStyle(.black)
-                                .multilineTextAlignment(.center)
-
-                            Button("Save") {
-                                saveName()
-                            }
-                            .font(.budsBodyBold)
+            VStack(spacing: 32) {
+                // Avatar
+                Circle()
+                    .fill(Color.budsPrimary.opacity(0.2))
+                    .frame(width: 120, height: 120)
+                    .overlay(
+                        Text(member.displayName.prefix(1).uppercased())
+                            .font(.system(size: 48, weight: .bold))
                             .foregroundColor(.budsPrimary)
-                        }
-                        .padding(.horizontal, 20)
-                    } else {
-                        HStack(spacing: 12) {
-                            Text(editedName)
-                                .font(.budsTitle)
-                                .foregroundColor(.white)
+                    )
 
-                            Button(action: {
-                                isEditingName = true
-                            }) {
-                                Image(systemName: "pencil")
-                                    .foregroundColor(.budsPrimary)
-                            }
-                        }
+                // Info
+                VStack(spacing: 16) {
+                    Text(member.displayName)
+                        .font(.budsTitle)
+                        .foregroundColor(.white)
+
+                    if let phone = member.phoneNumber {
+                        Text(phone)
+                            .font(.budsBody)
+                            .foregroundColor(.budsTextSecondary)
                     }
 
-                    // Status
-                    StatusBadge(status: member.status)
-
-                    // Info section
-                    VStack(spacing: 16) {
-                        if let phone = member.phoneNumber {
-                            InfoRow(label: "Phone", value: phone, icon: "phone.fill")
-                        }
-
-                        InfoRow(
-                            label: "DID",
-                            value: member.did,
-                            icon: "key.fill"
-                        )
-
-                        if let joinedAt = member.joinedAt {
-                            InfoRow(
-                                label: "Joined",
-                                value: joinedAt.formatted(date: .abbreviated, time: .omitted),
-                                icon: "calendar"
-                            )
-                        }
+                    HStack(spacing: 12) {
+                        Label(member.role.rawValue.capitalized, systemImage: "person.fill")
+                        JarMemberStatusBadge(status: member.status)
                     }
-                    .padding()
-                    .background(Color.budsCard)
-                    .cornerRadius(12)
-                    .padding(.horizontal, 20)
+                    .font(.budsCaption)
+                }
 
-                    Spacer()
+                Spacer()
 
-                    // Remove button
-                    Button(action: {
-                        showingRemoveAlert = true
-                    }) {
+                // Actions
+                if member.role != .owner && member.status == .active {
+                    Button(role: .destructive) {
+                        showingRemoveConfirmation = true
+                    } label: {
                         HStack {
-                            Image(systemName: "person.badge.minus")
-                            Text("Remove from Circle")
+                            Image(systemName: "person.fill.xmark")
+                            Text("Remove from Jar")
                         }
                         .font(.budsBodyBold)
-                        .foregroundColor(.budsDanger)
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(Color.budsDanger.opacity(0.1))
+                        .padding(.vertical, 16)
+                        .background(Color.red)
                         .cornerRadius(12)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    .padding(.horizontal)
+                    .disabled(isRemoving)
                 }
             }
-            .background(Color.black)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
+            .padding(.vertical, 32)
+        }
+        .confirmationDialog(
+            "Remove \(member.displayName)?",
+            isPresented: $showingRemoveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) {
+                Task { await removeMember() }
             }
-            .alert("Remove from Circle?", isPresented: $showingRemoveAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Remove", role: .destructive) {
-                    removeMember()
-                }
-            } message: {
-                Text("This person will no longer be able to see memories you share with your Circle.")
-            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("They will no longer have access to buds in \(jar.name).")
         }
     }
 
-    // MARK: - Actions
+    private func removeMember() async {
+        isRemoving = true
 
-    private func saveName() {
-        // TODO Phase 9: Update to use JarManager
-        print("⚠️ Circle features will be updated in Phase 9")
-        isEditingName = false
-    }
-
-    private func removeMember() {
-        // TODO Phase 9: Update to use JarManager
-        print("⚠️ Circle features will be updated in Phase 9")
-        dismiss()
-    }
-}
-
-// MARK: - Info Row Component
-
-struct InfoRow: View {
-    let label: String
-    let value: String
-    let icon: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(.budsPrimary)
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(label)
-                    .font(.budsCaption)
-                    .foregroundColor(.budsTextSecondary)
-
-                Text(value)
-                    .font(.budsBody)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-            }
-
-            Spacer()
+        do {
+            try await jarManager.removeMember(jarID: jar.id, memberDID: member.memberDID)
+            dismiss()
+        } catch {
+            print("❌ Failed to remove member: \(error)")
+            isRemoving = false
         }
     }
-}
-
-#Preview {
-    MemberDetailView(member: CircleMember(
-        id: "1",
-        did: "did:buds:test",
-        displayName: "Alex",
-        phoneNumber: "+1 (555) 123-4567",
-        avatarCID: nil,
-        pubkeyX25519: "test",
-        status: .active,
-        joinedAt: Date(),
-        invitedAt: Date(),
-        removedAt: nil,
-        createdAt: Date(),
-        updatedAt: Date()
-    ))
 }

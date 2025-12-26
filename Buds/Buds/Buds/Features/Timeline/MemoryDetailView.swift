@@ -92,7 +92,7 @@ struct MemoryDetailView: View {
                 Text("This action cannot be undone.")
             }
             .sheet(isPresented: $showingShareSheet) {
-                ShareToCircleView(memoryCID: memory.receiptCID)
+                ShareToCircleView(memoryCID: memory.receiptCID, jarID: memory.jarID)
             }
         }
     }

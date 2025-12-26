@@ -266,16 +266,18 @@ This is a private project (for now). Architecture by Claude (Anthropic) + Eric. 
 
 **See [PHASE_3_COMPLETE.md](./PHASE_3_COMPLETE.md)** for full Phase 3 details.
 
-### Current Status: 🚀 **LIVE ON TESTFLIGHT** (Dec 18, 2025)
+### Current Status: 🚀 **LIVE ON TESTFLIGHT** (Dec 26, 2025)
+
+**Latest**: Phase 8 Complete - Jar Architecture Migration ✅
 
 **What's working:**
-- ✅ Create memory with up to 3 photos
-- ✅ Swipeable image carousel with page indicators
-- ✅ Photo reordering with visual feedback
-- ✅ Full memory timeline with image previews
-- ✅ Receipt signing with Ed25519 (physics-tested)
-- ✅ Production CBOR encoder (0.11ms p50 latency)
-- ✅ All UI components styled and functional
+- ✅ Database: jars + jar_members tables, jar_id scoping on all buds
+- ✅ Backend: JarRepository + JarManager fully functional
+- ✅ Models: Jar, JarMember, Memory (with jarID property)
+- ✅ Migration: Circle members → Solo jar (zero data loss)
+- ✅ E2EE signature verification (Phase 7)
+- ✅ R2 storage migration (Phase 7)
+- ⚠️  Circle UI temporarily stubbed (Phase 9 will rebuild)
 
 **TestFlight:**
 - Build: v1.0 (Build 1)
@@ -391,13 +393,47 @@ This is a private project (for now). Architecture by Claude (Anthropic) + Eric. 
 
 **See [`PHASE_7_COMPLETE_SUMMARY.md`](./PHASE_7_COMPLETE_SUMMARY.md) for full details.**
 
+### Phase 8: Database Migration + Jar Architecture ✅ (COMPLETE - Dec 26, 2025)
+
+**Goal**: Transform from single Circle (implicit) → multiple Jars (explicit containers)
+
+**What Was Built**:
+- ✅ **Migration v5**: Created jars + jar_members tables
+- ✅ **jar_id Column**: Added to local_receipts (which jar owns this bud)
+- ✅ **sender_did Column**: Added to local_receipts (for received buds)
+- ✅ **Solo Jar Migration**: Migrated existing Circle members → Solo jar
+- ✅ **Jar Model**: Created Jar.swift (id, name, description, ownerDID)
+- ✅ **JarMember Model**: Created JarMember.swift (N:M relationship)
+- ✅ **JarRepository**: CRUD operations for jars and members
+- ✅ **JarManager**: Created (replaces CircleManager)
+- ✅ **MemoryRepository**: Updated with jar filtering (fetchByJar)
+- ⚠️  **Circle UI**: Temporarily stubbed (Phase 9 will rebuild)
+
+**Database Changes**:
+- `jars` table (id, name, description, owner_did, created_at, updated_at)
+- `jar_members` table (jar_id, member_did, display_name, role, status, pubkey_x25519)
+- `local_receipts.jar_id` column (TEXT NOT NULL DEFAULT 'solo')
+- `local_receipts.sender_did` column (TEXT)
+
+**Testing**:
+- ✅ Migration succeeds on existing users (14 members, 7 buds → Solo jar)
+- ✅ Migration succeeds on fresh installs (graceful deferral)
+- ✅ Build succeeds with no errors
+- ✅ Zero data loss
+
+**Files Created**: 4 (+450 lines)
+**Files Modified**: 9
+
+**See [`PHASE_8_COMPLETE.md`](./PHASE_8_COMPLETE.md) for full details.**
+
 ### Future Phases
-- [ ] **Phase 8:** Map View + Fuzzy Location Privacy
-- [ ] **Phase 9:** Agent Integration (DeepSeek/Qwen)
-- [ ] **Phase 10:** APNs Push Notifications (replace polling)
-- [ ] **Phase 11:** Tiered Photo Storage (30-day hot tier + iCloud)
-- [ ] **Phase 12:** Polish + TestFlight v2
+- [ ] **Phase 9:** Multi-Jar UI + Circle Rebuild (next up - see [`docs/phase9-plan.md`](./docs/phase9-plan.md))
+- [ ] **Phase 10:** Jar Feed View (media-first)
+- [ ] **Phase 11:** Map View + Fuzzy Location Privacy
+- [ ] **Phase 12:** Shop View + Remote Config
+- [ ] **Phase 13:** AI Buds v1 (Reflection-Only)
+- [ ] **Phase 14:** App Store Prep + Polish
 
-**Current file count:** 37 Swift files + 7 docs = E2EE with signature verification complete
+**Current file count:** 41 Swift files + 8 docs = Jar architecture complete
 
-**December 25, 2025: Phase 7 complete! E2EE signature verification + R2 storage migration deployed. Production-ready for 10k users. 🔐🚀**
+**December 26, 2025: Phase 8 complete! Jar architecture migration deployed. Multi-jar backend ready. 🫙✨**

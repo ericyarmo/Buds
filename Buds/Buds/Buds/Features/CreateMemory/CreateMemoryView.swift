@@ -9,8 +9,15 @@ import SwiftUI
 import Combine
 
 struct CreateMemoryView: View {
+    let jarID: String
+
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel = CreateMemoryViewModel()
+    @StateObject private var viewModel: CreateMemoryViewModel
+
+    init(jarID: String = "solo") {
+        self.jarID = jarID
+        _viewModel = StateObject(wrappedValue: CreateMemoryViewModel(jarID: jarID))
+    }
 
     var body: some View {
         NavigationStack {
@@ -202,6 +209,11 @@ final class CreateMemoryViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let repository = MemoryRepository()
+    private let jarID: String
+
+    init(jarID: String = "solo") {
+        self.jarID = jarID
+    }
 
     var isValid: Bool {
         !strainName.isEmpty && rating > 0
@@ -232,7 +244,9 @@ final class CreateMemoryViewModel: ObservableObject {
                 cbdPercent: cbdPercent,
                 amountGrams: nil,
                 effects: selectedEffects,
-                consumptionMethod: consumptionMethod
+                consumptionMethod: consumptionMethod,
+                locationCID: nil,
+                jarID: jarID
             )
 
             print("💾 CreateMemory: Memory created with ID: \(memory.id)")
