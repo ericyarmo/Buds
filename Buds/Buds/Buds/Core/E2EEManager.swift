@@ -122,7 +122,7 @@ class E2EEManager {
 
         // SECURITY: Get sender's device-specific Ed25519 public key (TOFU key pinning)
         // DO NOT trust message.senderSigningPublicKey (relay could swap it)
-        guard let pinnedPubkey = try await CircleManager.shared.getPinnedEd25519PublicKey(
+        guard let pinnedPubkey = try await JarManager.shared.getPinnedEd25519PublicKey(
             did: msg.senderDID,
             deviceId: msg.senderDeviceId
         ) else {

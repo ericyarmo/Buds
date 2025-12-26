@@ -9,7 +9,7 @@ import SwiftUI
 
 struct MemberDetailView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var circleManager = CircleManager.shared
+    // TODO Phase 9: Update to use JarManager
 
     let member: CircleMember
     @State private var showingRemoveAlert = false
@@ -138,25 +138,15 @@ struct MemberDetailView: View {
     // MARK: - Actions
 
     private func saveName() {
-        Task {
-            do {
-                try await circleManager.updateMemberName(member, newName: editedName)
-                isEditingName = false
-            } catch {
-                print("❌ Failed to update name: \(error)")
-            }
-        }
+        // TODO Phase 9: Update to use JarManager
+        print("⚠️ Circle features will be updated in Phase 9")
+        isEditingName = false
     }
 
     private func removeMember() {
-        Task {
-            do {
-                try await circleManager.removeMember(member)
-                dismiss()
-            } catch {
-                print("❌ Failed to remove member: \(error)")
-            }
-        }
+        // TODO Phase 9: Update to use JarManager
+        print("⚠️ Circle features will be updated in Phase 9")
+        dismiss()
     }
 }
 

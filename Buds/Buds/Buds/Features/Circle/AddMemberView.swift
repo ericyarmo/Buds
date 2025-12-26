@@ -9,7 +9,7 @@ import SwiftUI
 
 struct AddMemberView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var circleManager = CircleManager.shared
+    // TODO Phase 9: Update to use JarManager
 
     @State private var phoneNumber = ""
     @State private var displayName = ""
@@ -135,9 +135,15 @@ struct AddMemberView: View {
         errorMessage = nil
         isAdding = true
 
+        // TODO Phase 9: Update to use JarManager
+        errorMessage = "Circle features will be updated in Phase 9"
+        isAdding = false
+
+        /*
         Task {
             do {
-                try await circleManager.addMember(
+                try await jarManager.addMember(
+                    jarID: "solo",
                     phoneNumber: "+1\(phoneNumber.filter { $0.isNumber })",
                     displayName: displayName
                 )
@@ -147,6 +153,7 @@ struct AddMemberView: View {
             }
             isAdding = false
         }
+        */
     }
 }
 

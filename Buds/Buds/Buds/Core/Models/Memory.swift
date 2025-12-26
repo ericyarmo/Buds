@@ -42,6 +42,9 @@ struct Memory: Identifiable, Codable {
     var isShared: Bool
     var imageData: [Data]  // Array of up to 3 images
 
+    // Jar scoping (Phase 8)
+    var jarID: String  // Which jar this bud belongs to
+
     // Shared memory metadata (Phase 7)
     var senderDID: String?  // If received from Circle member
 
@@ -147,7 +150,8 @@ extension Memory {
             locationName: "Home",
             isFavorited: false,
             isShared: false,
-            imageData: []
+            imageData: [],
+            jarID: "solo"
         )
     }
 
@@ -173,7 +177,8 @@ extension Memory {
                 locationName: nil,
                 isFavorited: true,
                 isShared: true,
-                imageData: []
+                imageData: [],
+                jarID: "solo"
             )
         ]
     }

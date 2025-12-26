@@ -70,6 +70,11 @@ final class Database {
             try migrateToReceivedMemories(db)
         }
 
+        // Migration v5: Jar architecture (Phase 8)
+        migrator.registerMigration("v5_jars") { db in
+            try migrateToJars(db)
+        }
+
         return migrator
     }
 
@@ -360,3 +365,209 @@ private func migrateToReceivedMemories(_ db: GRDB.Database) throws {
 
     print("✅ Migration v4 complete: Received memories table created")
 }
+
+// MARK: - Migration v5: Jar Architecture (Phase 8)
+
+private func migrateToJars(_ db: GRDB.Database) throws {
+    let now = Date().timeIntervalSince1970
+
+    print("🔧 [MIGRATION v5] Starting jar architecture migration...")
+
+    // STEP 1: Create jars table
+    try db.execute(sql: """
+        CREATE TABLE IF NOT EXISTS jars (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          owner_did TEXT NOT NULL,
+          created_at REAL NOT NULL,
+          updated_at REAL NOT NULL
+        );
+    """)
+
+    try db.execute(sql: """
+        CREATE INDEX IF NOT EXISTS idx_jars_owner_did ON jars(owner_did);
+    """)
+
+    print("✅ [MIGRATION v5] Created jars table")
+
+    // STEP 2: Create jar_members table
+    try db.execute(sql: """
+        CREATE TABLE IF NOT EXISTS jar_members (
+          jar_id TEXT NOT NULL,
+          member_did TEXT NOT NULL,
+          display_name TEXT NOT NULL,
+          phone_number TEXT,
+          avatar_cid TEXT,
+          pubkey_x25519 TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'member',
+          status TEXT NOT NULL DEFAULT 'active',
+          joined_at REAL,
+          invited_at REAL,
+          removed_at REAL,
+          created_at REAL NOT NULL,
+          updated_at REAL NOT NULL,
+          PRIMARY KEY (jar_id, member_did),
+          FOREIGN KEY (jar_id) REFERENCES jars(id) ON DELETE CASCADE
+        );
+    """)
+
+    try db.execute(sql: """
+        CREATE INDEX IF NOT EXISTS idx_jar_members_jar_id ON jar_members(jar_id);
+        CREATE INDEX IF NOT EXISTS idx_jar_members_member_did ON jar_members(member_did);
+        CREATE INDEX IF NOT EXISTS idx_jar_members_status ON jar_members(jar_id, status);
+    """)
+
+    print("✅ [MIGRATION v5] Created jar_members table")
+
+    // STEP 3: Add jar_id and sender_did columns to local_receipts (MUST happen even on fresh install)
+    let jarIDColumnExists = try Bool.fetchOne(db, sql: """
+        SELECT COUNT(*) > 0 FROM pragma_table_info('local_receipts')
+        WHERE name='jar_id'
+    """) ?? false
+
+    if !jarIDColumnExists {
+        try db.execute(sql: """
+            ALTER TABLE local_receipts ADD COLUMN jar_id TEXT NOT NULL DEFAULT 'solo'
+        """)
+        print("✅ [MIGRATION v5] Added jar_id column to local_receipts")
+    }
+
+    let senderDIDColumnExists = try Bool.fetchOne(db, sql: """
+        SELECT COUNT(*) > 0 FROM pragma_table_info('local_receipts')
+        WHERE name='sender_did'
+    """) ?? false
+
+    if !senderDIDColumnExists {
+        try db.execute(sql: """
+            ALTER TABLE local_receipts ADD COLUMN sender_did TEXT
+        """)
+        print("✅ [MIGRATION v5] Added sender_did column to local_receipts")
+    }
+
+    // Create indexes
+    try db.execute(sql: """
+        CREATE INDEX IF NOT EXISTS idx_local_receipts_jar_id ON local_receipts(jar_id)
+    """)
+
+    // STEP 4: Get current user's DID (from active device)
+    let currentUserDID = try String.fetchOne(db, sql: """
+        SELECT owner_did FROM devices WHERE status = 'active' LIMIT 1
+    """)
+
+    // If no device exists yet (fresh install), skip Solo jar creation
+    // It will be created when user first logs in
+    guard let ownerDID = currentUserDID else {
+        print("⚠️  [MIGRATION v5] No active device found - skipping Solo jar creation (will create on first login)")
+        print("🎉 [MIGRATION v5] Migration complete (tables created, Solo jar deferred)")
+        return
+    }
+
+    print("🔧 [MIGRATION v5] Current user DID: \(ownerDID)")
+
+    // STEP 4: Create "Solo" jar
+    let soloJarExists = try Bool.fetchOne(db, sql: """
+        SELECT COUNT(*) > 0 FROM jars WHERE id = 'solo'
+    """) ?? false
+
+    if !soloJarExists {
+        try db.execute(sql: """
+            INSERT INTO jars (id, name, description, owner_did, created_at, updated_at)
+            VALUES ('solo', 'Solo', 'Your private buds', ?, ?, ?)
+        """, arguments: [ownerDID, now, now])
+
+        print("✅ [MIGRATION v5] Created Solo jar")
+    }
+
+    // STEP 5: Add current user as owner of Solo jar
+    try db.execute(sql: """
+        INSERT OR IGNORE INTO jar_members (
+          jar_id, member_did, display_name, phone_number, avatar_cid,
+          pubkey_x25519, role, status, created_at, updated_at
+        )
+        SELECT
+          'solo' AS jar_id,
+          d.owner_did AS member_did,
+          'You' AS display_name,
+          NULL AS phone_number,
+          NULL AS avatar_cid,
+          d.pubkey_x25519,
+          'owner' AS role,
+          'active' AS status,
+          ? AS created_at,
+          ? AS updated_at
+        FROM devices d
+        WHERE d.status = 'active'
+        LIMIT 1
+    """, arguments: [now, now])
+
+    print("✅ [MIGRATION v5] Added current user as owner of Solo jar")
+
+    // STEP 6: Migrate Circle members to jar_members (if circles table exists)
+    let circlesTableExists = try Bool.fetchOne(db, sql: """
+        SELECT COUNT(*) > 0 FROM sqlite_master
+        WHERE type='table' AND name='circles'
+    """) ?? false
+
+    if circlesTableExists {
+        let circleCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM circles") ?? 0
+        print("🔧 [MIGRATION v5] Migrating \(circleCount) Circle members to Solo jar...")
+
+        try db.execute(sql: """
+            INSERT OR IGNORE INTO jar_members (
+              jar_id, member_did, display_name, phone_number, avatar_cid,
+              pubkey_x25519, role, status, joined_at, invited_at, removed_at,
+              created_at, updated_at
+            )
+            SELECT
+              'solo' AS jar_id,
+              c.did AS member_did,
+              c.display_name,
+              c.phone_number,
+              c.avatar_cid,
+              c.pubkey_x25519,
+              'member' AS role,
+              c.status,
+              c.joined_at,
+              c.invited_at,
+              c.removed_at,
+              c.created_at,
+              c.updated_at
+            FROM circles c
+        """)
+
+        // VERIFICATION: Check migration succeeded
+        let jarMemberCount = try Int.fetchOne(db, sql: """
+            SELECT COUNT(*) FROM jar_members WHERE jar_id = 'solo'
+        """) ?? 0
+
+        // Subtract 1 for current user (already added as owner)
+        let migratedCount = jarMemberCount - 1
+
+        print("🔧 [MIGRATION v5] Migrated \(migratedCount) Circle members (expected \(circleCount))")
+
+        // Drop circles table
+        try db.execute(sql: "DROP TABLE IF EXISTS circles")
+        print("✅ [MIGRATION v5] Dropped old circles table")
+    } else {
+        print("⚠️  [MIGRATION v5] No circles table found, skipping Circle member migration")
+    }
+
+    // STEP 7: Update all existing memories to belong to Solo jar (explicitly set)
+    try db.execute(sql: """
+        UPDATE local_receipts SET jar_id = 'solo'
+        WHERE jar_id IS NULL OR jar_id = ''
+    """)
+
+    let memoryCount = try Int.fetchOne(db, sql: """
+        SELECT COUNT(*) FROM local_receipts WHERE jar_id = 'solo'
+    """) ?? 0
+
+    print("✅ [MIGRATION v5] Migrated \(memoryCount) buds to Solo jar")
+    print("🎉 [MIGRATION v5] Migration complete!")
+}
+
+struct DatabaseError: Error {
+    let message: String
+}
+

@@ -9,16 +9,16 @@ import SwiftUI
 
 struct ShareToCircleView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var circleManager = CircleManager.shared
     @StateObject private var shareManager = ShareManager.shared
 
     let memoryCID: String
 
     @State private var selectedDIDs: Set<String> = []
     @State private var error: String?
+    @State private var members: [CircleMember] = []  // TODO Phase 9: Update to use JarMembers
 
     private var allSelected: Bool {
-        !circleManager.members.isEmpty && selectedDIDs.count == circleManager.members.count
+        !members.isEmpty && selectedDIDs.count == members.count
     }
 
     var body: some View {
@@ -46,7 +46,7 @@ struct ShareToCircleView: View {
                 // Member list
                 ScrollView {
                     VStack(spacing: 12) {
-                        ForEach(circleManager.members, id: \.id) { member in
+                        ForEach(members, id: \.id) { member in
                             MemberRow(
                                 member: member,
                                 isSelected: selectedDIDs.contains(member.did)
@@ -125,7 +125,7 @@ struct ShareToCircleView: View {
             selectedDIDs.removeAll()
         } else {
             // Select all
-            selectedDIDs = Set(circleManager.members.map(\.did))
+            selectedDIDs = Set(members.map(\.did))
         }
     }
 }

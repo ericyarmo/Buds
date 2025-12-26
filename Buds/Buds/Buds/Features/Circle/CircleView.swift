@@ -8,14 +8,15 @@
 import SwiftUI
 
 struct CircleView: View {
-    @StateObject private var circleManager = CircleManager.shared
+    // TODO Phase 9: Update to use JarManager and Jars
     @State private var showingAddMember = false
     @State private var showingMemberDetail: CircleMember?
+    @State private var members: [CircleMember] = []
 
     var body: some View {
         NavigationView {
             ZStack {
-                if circleManager.members.isEmpty {
+                if members.isEmpty {
                     emptyState
                 } else {
                     membersList
@@ -31,7 +32,7 @@ struct CircleView: View {
                         Image(systemName: "person.badge.plus")
                             .foregroundColor(.budsPrimary)
                     }
-                    .disabled(circleManager.members.count >= 12)
+                    .disabled(members.count >= 12)
                 }
             }
             .sheet(isPresented: $showingAddMember) {
@@ -90,7 +91,7 @@ struct CircleView: View {
                 capacityIndicator
 
                 // Member cards
-                ForEach(circleManager.members, id: \.id) { member in
+                ForEach(members, id: \.id) { member in
                     MemberCard(member: member)
                         .onTapGesture {
                             showingMemberDetail = member
@@ -107,7 +108,7 @@ struct CircleView: View {
             Image(systemName: "person.2.fill")
                 .foregroundColor(.budsPrimary)
 
-            Text("\(circleManager.members.count) / 12 members")
+            Text("\(members.count) / 12 members")
                 .font(.budsCaption)
                 .foregroundColor(.budsTextSecondary)
 

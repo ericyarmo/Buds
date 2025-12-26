@@ -126,7 +126,7 @@ actor InboxManager {
 
         // Step 1: Get device-specific pinned key (TOFU key pinning)
         print("🔐 [INBOX] Looking up device-specific pinned Ed25519 key...")
-        guard let pinnedPubkeyData = try await CircleManager.shared.getPinnedEd25519PublicKey(
+        guard let pinnedPubkeyData = try await JarManager.shared.getPinnedEd25519PublicKey(
             did: message.senderDID,
             deviceId: message.senderDeviceId
         ) else {

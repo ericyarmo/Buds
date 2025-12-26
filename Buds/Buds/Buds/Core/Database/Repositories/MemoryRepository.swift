@@ -28,6 +28,7 @@ struct MemoryRepository {
                     lr.tags_json,
                     lr.local_notes,
                     lr.image_cids,
+                    lr.jar_id,
                     rm.sender_did
                 FROM local_receipts lr
                 JOIN ucr_headers h ON lr.header_cid = h.cid
@@ -37,6 +38,35 @@ struct MemoryRepository {
                 """
 
             let rows = try Row.fetchAll(db, sql: sql, arguments: [ReceiptType.sessionCreated])
+            return try rows.compactMap { row in
+                try parseMemory(from: row, db: db)
+            }
+        }
+    }
+
+    /// Fetch memories for a specific jar (Phase 8)
+    func fetchByJar(jarID: String) async throws -> [Memory] {
+        try await db.readAsync { db in
+            let sql = """
+                SELECT
+                    lr.uuid,
+                    h.cid,
+                    h.payload_json,
+                    h.received_at,
+                    lr.is_favorited,
+                    lr.tags_json,
+                    lr.local_notes,
+                    lr.image_cids,
+                    lr.jar_id,
+                    rm.sender_did
+                FROM local_receipts lr
+                JOIN ucr_headers h ON lr.header_cid = h.cid
+                LEFT JOIN received_memories rm ON rm.header_cid = h.cid
+                WHERE h.receipt_type = ? AND lr.jar_id = ?
+                ORDER BY h.received_at DESC
+                """
+
+            let rows = try Row.fetchAll(db, sql: sql, arguments: [ReceiptType.sessionCreated, jarID])
             return try rows.compactMap { row in
                 try parseMemory(from: row, db: db)
             }
@@ -56,6 +86,7 @@ struct MemoryRepository {
                     lr.tags_json,
                     lr.local_notes,
                     lr.image_cids,
+                    lr.jar_id,
                     rm.sender_did
                 FROM local_receipts lr
                 JOIN ucr_headers h ON lr.header_cid = h.cid
@@ -85,7 +116,8 @@ struct MemoryRepository {
         amountGrams: Double?,
         effects: [String],
         consumptionMethod: ConsumptionMethod?,
-        locationCID: String? = nil
+        locationCID: String? = nil,
+        jarID: String = "solo"  // Phase 8: Default to solo jar
     ) async throws -> Memory {
 
         // Build payload
@@ -119,10 +151,10 @@ struct MemoryRepository {
                 sql: """
                     INSERT INTO local_receipts (
                         uuid, header_cid, is_favorited, tags_json, local_notes,
-                        image_cids, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        image_cids, jar_id, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                arguments: [uuid.uuidString, cid, false, nil, nil, "[]", now, now]
+                arguments: [uuid.uuidString, cid, false, nil, nil, "[]", jarID, now, now]
             )
         }
 
@@ -147,6 +179,7 @@ struct MemoryRepository {
             isFavorited: false,
             isShared: false,
             imageData: [],
+            jarID: jarID,
             senderDID: nil
         )
     }
@@ -331,10 +364,10 @@ struct MemoryRepository {
                     sql: """
                         INSERT INTO local_receipts (
                             uuid, header_cid, is_favorited, tags_json, local_notes,
-                            image_cids, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            image_cids, jar_id, sender_did, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                    arguments: [uuid.uuidString, receiptCID, false, nil, nil, "[]", now, now]
+                    arguments: [uuid.uuidString, receiptCID, false, nil, nil, "[]", "solo", senderDID, now, now]
                 )
                 print("🗄️  [MemoryRepo] Inserted into local_receipts")
             }
@@ -399,6 +432,7 @@ struct MemoryRepository {
 
         // Check if this is a received memory (shared from Circle)
         let senderDID = row["sender_did"] as? String
+        let jarID = (row["jar_id"] as? String) ?? "solo"  // Default to solo if missing
 
         return Memory(
             id: UUID(uuidString: row["uuid"])!,
@@ -420,6 +454,7 @@ struct MemoryRepository {
             isFavorited: (row["is_favorited"] as Int) == 1,
             isShared: senderDID != nil,  // Shared if received from someone
             imageData: imageData,
+            jarID: jarID,
             senderDID: senderDID
         )
     }

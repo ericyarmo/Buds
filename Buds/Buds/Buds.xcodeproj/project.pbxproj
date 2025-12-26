@@ -52,6 +52,10 @@
 		58FFD9AD2EFC945600C0A7DB /* InboxManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */; };
 		58FFD9AF2EFCD9F200C0A7DB /* CBORDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9AE2EFCD9F200C0A7DB /* CBORDecoder.swift */; };
 		58FFD9B12EFCDA2400C0A7DB /* EncryptedMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B02EFCDA2400C0A7DB /* EncryptedMessage.swift */; };
+		58FFD9B32EFE20C600C0A7DB /* JarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B22EFE20C600C0A7DB /* JarManager.swift */; };
+		58FFD9B62EFE20DE00C0A7DB /* Jar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B42EFE20DE00C0A7DB /* Jar.swift */; };
+		58FFD9B72EFE20DE00C0A7DB /* JarMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B52EFE20DE00C0A7DB /* JarMember.swift */; };
+		58FFD9B92EFE20E900C0A7DB /* JarRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B82EFE20E900C0A7DB /* JarRepository.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -118,6 +122,10 @@
 		58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxManager.swift; sourceTree = "<group>"; };
 		58FFD9AE2EFCD9F200C0A7DB /* CBORDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBORDecoder.swift; sourceTree = "<group>"; };
 		58FFD9B02EFCDA2400C0A7DB /* EncryptedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptedMessage.swift; sourceTree = "<group>"; };
+		58FFD9B22EFE20C600C0A7DB /* JarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarManager.swift; sourceTree = "<group>"; };
+		58FFD9B42EFE20DE00C0A7DB /* Jar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Jar.swift; sourceTree = "<group>"; };
+		58FFD9B52EFE20DE00C0A7DB /* JarMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarMember.swift; sourceTree = "<group>"; };
+		58FFD9B82EFE20E900C0A7DB /* JarRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarRepository.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -206,6 +214,7 @@
 		58FFD9322EF2900D00C0A7DB /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9B82EFE20E900C0A7DB /* JarRepository.swift */,
 				58FFD9312EF2900D00C0A7DB /* MemoryRepository.swift */,
 			);
 			path = Repositories;
@@ -235,6 +244,9 @@
 		58FFD9382EF2900D00C0A7DB /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				58FFD9B42EFE20DE00C0A7DB /* Jar.swift */,
+				58FFD9B52EFE20DE00C0A7DB /* JarMember.swift */,
+				58FFD9B22EFE20C600C0A7DB /* JarManager.swift */,
 				58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */,
 				58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */,
 				58FFD9A42EFA2E2B00C0A7DB /* E2EEManager.swift */,
@@ -526,6 +538,8 @@
 				58FFD9A22EFA2DF900C0A7DB /* RelayClient.swift in Sources */,
 				58FFD9952EF71BFE00C0A7DB /* Device.swift in Sources */,
 				58FFD94E2EF2900D00C0A7DB /* CBORCanonical.swift in Sources */,
+				58FFD9B62EFE20DE00C0A7DB /* Jar.swift in Sources */,
+				58FFD9B72EFE20DE00C0A7DB /* JarMember.swift in Sources */,
 				58FFD94F2EF2900D00C0A7DB /* CBOREncoder.swift in Sources */,
 				58FFD9502EF2900D00C0A7DB /* CBORValue.swift in Sources */,
 				58FFD98C2EF4BBA300C0A7DB /* PhoneAuthView.swift in Sources */,
@@ -553,8 +567,10 @@
 				58FFD99E2EF71C2900C0A7DB /* AddMemberView.swift in Sources */,
 				58FFD95D2EF2900D00C0A7DB /* Typography.swift in Sources */,
 				58FFD9822EF3470A00C0A7DB /* ImageCarousel.swift in Sources */,
+				58FFD9B32EFE20C600C0A7DB /* JarManager.swift in Sources */,
 				58FFD9AB2EFA2E6600C0A7DB /* ShareToCircleView.swift in Sources */,
 				58FFD95E2EF2900D00C0A7DB /* EffectTag.swift in Sources */,
+				58FFD9B92EFE20E900C0A7DB /* JarRepository.swift in Sources */,
 				58FFD95F2EF2900D00C0A7DB /* MemoryCard.swift in Sources */,
 				58FFD9972EF71C1100C0A7DB /* CircleManager.swift in Sources */,
 			);
