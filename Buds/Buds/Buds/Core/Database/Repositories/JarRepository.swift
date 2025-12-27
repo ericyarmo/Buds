@@ -66,10 +66,54 @@ final class JarRepository {
         return jar
     }
 
+    /// Safe jar deletion: moves memories to Solo jar, deletes members, then deletes jar
+    /// CRITICAL: Solo jar cannot be deleted (system jar)
     func deleteJar(id: String) async throws {
-        try await Database.shared.writeAsync { db in
+        let db = Database.shared
+
+        // 1. Get jar to verify it exists and check if it's Solo
+        guard let jar = try await getJar(id: id) else {
+            throw JarError.jarNotFound
+        }
+
+        // 2. Prevent Solo jar deletion
+        let isSolo = jar.name.trimmingCharacters(in: .whitespaces).lowercased() == "solo"
+        guard !isSolo else {
+            throw JarError.cannotDeleteSoloJar
+        }
+
+        // 3. Get Solo jar ID for memory reassignment
+        let allJars = try await getAllJars()
+        guard let soloJar = allJars.first(where: {
+            $0.name.trimmingCharacters(in: .whitespaces).lowercased() == "solo"
+        }) else {
+            throw JarError.soloJarNotFound
+        }
+
+        // 4. Move all memories from this jar to Solo jar
+        try await db.writeAsync { db in
+            let movedCount = try db.execute(
+                sql: "UPDATE local_receipts SET jar_id = ? WHERE jar_id = ?",
+                arguments: [soloJar.id, id]
+            )
+            print("📦 Moved \(movedCount) memories from \(jar.name) to Solo")
+        }
+
+        // 5. Delete all jar members (just associations, not the users themselves)
+        try await db.writeAsync { db in
+            let deletedMembers = try db.execute(
+                sql: "DELETE FROM jar_members WHERE jar_id = ?",
+                arguments: [id]
+            )
+            print("👥 Deleted \(deletedMembers) member associations")
+        }
+
+        // 6. Delete the jar itself
+        try await db.writeAsync { db in
             try Jar.deleteOne(db, key: id)
         }
+
+        print("✅ Deleted jar '\(jar.name)' (id: \(id))")
     }
 
     // MARK: - Jar Members CRUD

@@ -10,6 +10,8 @@
 		5893A3A42EFE8129001F310F /* JarCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3A32EFE8129001F310F /* JarCard.swift */; };
 		5893A3A72EFE813E001F310F /* JarDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3A62EFE813E001F310F /* JarDetailView.swift */; };
 		5893A3A82EFE813E001F310F /* CreateJarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3A52EFE813E001F310F /* CreateJarView.swift */; };
+		5893A3AC2EFF49F3001F310F /* ShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3AA2EFF49F3001F310F /* ShelfView.swift */; };
+		5893A3AD2EFF49F3001F310F /* ShelfJarCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3A92EFF49F3001F310F /* ShelfJarCard.swift */; };
 		58FFD94B2EF2900D00C0A7DB /* Info-Template.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD93F2EF2900D00C0A7DB /* Info-Template.plist */; };
 		58FFD94C2EF2900D00C0A7DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD9492EF2900D00C0A7DB /* Assets.xcassets */; };
 		58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9282EF2900D00C0A7DB /* BudsApp.swift */; };
@@ -82,6 +84,8 @@
 		5893A3A32EFE8129001F310F /* JarCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarCard.swift; sourceTree = "<group>"; };
 		5893A3A52EFE813E001F310F /* CreateJarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateJarView.swift; sourceTree = "<group>"; };
 		5893A3A62EFE813E001F310F /* JarDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarDetailView.swift; sourceTree = "<group>"; };
+		5893A3A92EFF49F3001F310F /* ShelfJarCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfJarCard.swift; sourceTree = "<group>"; };
+		5893A3AA2EFF49F3001F310F /* ShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
 		58FFD8C92EF28ECE00C0A7DB /* Buds.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Buds.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8D62EF28ED100C0A7DB /* BudsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8E02EF28ED100C0A7DB /* BudsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -175,6 +179,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		5893A3AB2EFF49F3001F310F /* Shelf */ = {
+			isa = PBXGroup;
+			children = (
+				5893A3A92EFF49F3001F310F /* ShelfJarCard.swift */,
+				5893A3AA2EFF49F3001F310F /* ShelfView.swift */,
+			);
+			path = Shelf;
+			sourceTree = "<group>";
+		};
 		58FFD8C02EF28ECE00C0A7DB = {
 			isa = PBXGroup;
 			children = (
@@ -288,6 +301,7 @@
 		58FFD93E2EF2900D00C0A7DB /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3AB2EFF49F3001F310F /* Shelf */,
 				58FFD9AA2EFA2E6600C0A7DB /* Share */,
 				58FFD99B2EF71C2900C0A7DB /* Circle */,
 				58FFD98E2EF4BBB600C0A7DB /* Profile */,
@@ -573,6 +587,8 @@
 				58FFD97C2EF3462500C0A7DB /* MemoryDetailView.swift in Sources */,
 				58FFD9AF2EFCD9F200C0A7DB /* CBORDecoder.swift in Sources */,
 				58FFD95B2EF2900D00C0A7DB /* Colors.swift in Sources */,
+				5893A3AC2EFF49F3001F310F /* ShelfView.swift in Sources */,
+				5893A3AD2EFF49F3001F310F /* ShelfJarCard.swift in Sources */,
 				58FFD95C2EF2900D00C0A7DB /* Spacing.swift in Sources */,
 				58FFD99C2EF71C2900C0A7DB /* MemberDetailView.swift in Sources */,
 				58FFD99D2EF71C2900C0A7DB /* CircleView.swift in Sources */,

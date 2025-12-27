@@ -14,6 +14,7 @@ class JarManager: ObservableObject {
     static let shared = JarManager()
 
     @Published var jars: [Jar] = []
+    @Published var jarStats: [String: JarStats] = [:]  // Phase 9b: Stats cache
     @Published var isLoading = false
 
     private let maxJarSize = 12
@@ -28,16 +29,22 @@ class JarManager: ObservableObject {
 
     func loadJars() async {
         isLoading = true
+        defer { isLoading = false }
 
         do {
-            let loadedJars = try await JarRepository.shared.getAllJars()
-            jars = loadedJars
-            print("✅ Loaded \(jars.count) jars")
+            // Parallel fetch: jars + stats (Phase 9b optimization)
+            async let jarsResult = JarRepository.shared.getAllJars()
+            async let statsResult = MemoryRepository().fetchAllJarStats()
+
+            let (loadedJars, loadedStats) = try await (jarsResult, statsResult)
+
+            self.jars = loadedJars
+            self.jarStats = loadedStats
+
+            print("✅ Loaded \(jars.count) jars with stats")
         } catch {
             print("❌ Failed to load jars: \(error)")
         }
-
-        isLoading = false
     }
 
     func createJar(name: String, description: String? = nil) async throws -> Jar {
@@ -64,11 +71,23 @@ class JarManager: ObservableObject {
     /// CRITICAL: Must be called after auth to avoid crash on fresh install
     func ensureSoloJarExists() async throws {
         let jars = try await JarRepository.shared.getAllJars()
-        guard !jars.contains(where: { $0.name == "Solo" }) else {
+
+        print("🔍 [JarManager] Checking for Solo jar... Found \(jars.count) total jars")
+        for jar in jars {
+            print("🔍 [JarManager] Jar: '\(jar.name)' (id: \(jar.id))")
+        }
+
+        // Case-insensitive check with trimming
+        let hasSoloJar = jars.contains { jar in
+            jar.name.trimmingCharacters(in: .whitespaces).lowercased() == "solo"
+        }
+
+        if hasSoloJar {
             print("✅ Solo jar already exists")
             return
         }
 
+        print("⚠️ No Solo jar found - creating one")
         let currentDID = try await IdentityManager.shared.currentDID
 
         _ = try await JarRepository.shared.createJar(
@@ -198,6 +217,9 @@ enum JarError: Error, LocalizedError {
     case invalidPhoneNumber
     case userNotFound
     case userNotRegistered
+    case jarNotFound
+    case cannotDeleteSoloJar
+    case soloJarNotFound
 
     var errorDescription: String? {
         switch self {
@@ -213,6 +235,12 @@ enum JarError: Error, LocalizedError {
             return "User not found on Buds"
         case .userNotRegistered:
             return "User hasn't registered with Buds yet"
+        case .jarNotFound:
+            return "Jar not found"
+        case .cannotDeleteSoloJar:
+            return "Cannot delete Solo jar (system jar)"
+        case .soloJarNotFound:
+            return "Solo jar not found. Please reinstall the app."
         }
     }
 }

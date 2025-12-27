@@ -12,30 +12,23 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            TimelineView()
+            ShelfView()
                 .tabItem {
-                    Label("Timeline", systemImage: "book.fill")
+                    Label("Shelf", systemImage: "square.stack.3d.up.fill")
                 }
                 .tag(0)
 
-            Text("Map (Coming Soon)")
-                .font(.budsHeadline)
-                .tabItem {
-                    Label("Map", systemImage: "map.fill")
-                }
-                .tag(1)
-
-            CircleView()
+            CircleView()  // Keep for safer rollback (Phase 9b)
                 .tabItem {
                     Label("Circle", systemImage: "person.2.fill")
                 }
-                .tag(2)
+                .tag(1)
 
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(3)
+                .tag(2)
         }
         .tint(.budsPrimary)
     }

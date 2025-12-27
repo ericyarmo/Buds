@@ -9,6 +9,14 @@ import Foundation
 import GRDB
 import Combine
 
+/// Lightweight stats for jar overview (Phase 9b)
+struct JarStats {
+    let jarID: String
+    let totalBuds: Int
+    let recentBuds: Int      // Created in last 24h
+    let lastCreatedAt: Date?
+}
+
 struct MemoryRepository {
     private let db = Database.shared
     private let receiptManager = ReceiptManager.shared
@@ -99,6 +107,39 @@ struct MemoryRepository {
             }
 
             return try parseMemory(from: row, db: db)
+        }
+    }
+
+    /// Fetch stats for all jars (Phase 9b - single batch query)
+    func fetchAllJarStats() async throws -> [String: JarStats] {
+        try await db.readAsync { db in
+            let twentyFourHoursAgo = Date().addingTimeInterval(-24 * 60 * 60).timeIntervalSince1970
+
+            let sql = """
+                SELECT
+                    lr.jar_id,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN h.received_at > ? THEN 1 ELSE 0 END) as recent,
+                    MAX(h.received_at) as last_created
+                FROM local_receipts lr
+                JOIN ucr_headers h ON lr.header_cid = h.cid
+                WHERE h.receipt_type = ?
+                GROUP BY lr.jar_id
+                """
+
+            let rows = try Row.fetchAll(db, sql: sql, arguments: [twentyFourHoursAgo, ReceiptType.sessionCreated])
+
+            var stats: [String: JarStats] = [:]
+            for row in rows {
+                let jarID = row["jar_id"] as String
+                stats[jarID] = JarStats(
+                    jarID: jarID,
+                    totalBuds: row["total"] as Int,
+                    recentBuds: row["recent"] as Int,
+                    lastCreatedAt: (row["last_created"] as? Double).map { Date(timeIntervalSince1970: $0) }
+                )
+            }
+            return stats
         }
     }
 

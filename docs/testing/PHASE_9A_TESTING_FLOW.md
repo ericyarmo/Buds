@@ -910,12 +910,13 @@ OR
 
 ### Issues Found
 
-#### 1. ✅ FIXED: Jar name invisible in CircleView (dark mode)
+#### 1. ⚠️ PARTIAL FIX: Jar name color in CircleView
 **Severity**: High (UX blocker)
 **Location**: `buds/Buds/Buds/Buds/Shared/Views/JarCard.swift:30`
-**Description**: Jar names appeared in white text, invisible in dark mode.
-**Fix Applied**: Changed text color from `.white` to `.budsTextPrimary` (adaptive color)
-**Status**: ✅ FIXED - Text now adapts to dark/light mode
+**Description**: Jar names still match background color in CircleView, making them hard to read.
+**Attempted Fix**: Changed text color from `.white` to `.budsTextPrimary` (adaptive color)
+**Status**: ⚠️ STILL HAS ISSUES - Text color still problematic
+**Decision**: Leaving as-is for now since Phase 9b will redesign the entire Circle/Shelf UI. Will address in UI overhaul.
 
 #### 2. ✅ FIXED: Friend names invisible in JarDetailView (dark mode)
 **Severity**: High (UX blocker)
@@ -955,12 +956,23 @@ OR
 **Impact**: Cannot verify database integrity for jar_id assignments, member records, etc.
 **Recommendation**: Add in-app debug view or use different DB browser for testing.
 
-#### 6. ✅ FIXED: Solo jar created on every app launch
-**Severity**: Medium (duplicate data)
-**Description**: App logs "✅ Created Solo jar for fresh install" even on relaunch when jar already exists.
-**Root Cause**: `ensureSoloJarExists()` was checking for `id == "solo"`, but `createJar()` generates random UUID
-**Fix Applied**: Changed check from `$0.id == "solo"` to `$0.name == "Solo"` in JarManager.swift:67
-**Status**: ✅ FIXED - Now correctly detects existing Solo jar
+#### 6. ⚠️ IN PROGRESS: Solo jar created on every app delete/rebuild
+**Severity**: CRITICAL (duplicate data)
+**Description**: Every time app is deleted and rebuilt, a new Solo jar is created. When app is just relaunched, it should detect existing Solo jar but current check may be failing.
+**Root Cause Investigation**:
+- Initial issue: `ensureSoloJarExists()` was checking `id == "solo"`, but `createJar()` generates random UUID
+- First fix: Changed to check `name == "Solo"`
+- User reports still creating duplicates on delete/rebuild
+**Fix Applied** (JarManager.swift:65-94):
+- Case-insensitive comparison with whitespace trimming
+- Check: `jar.name.trimmingCharacters(in: .whitespaces).lowercased() == "solo"`
+- Added detailed debug logging with "🔍 [JarManager]" prefix
+- Logs show all existing jars before deciding whether to create Solo jar
+**Status**: ⚠️ TESTING REQUIRED - Need to run app and verify console logs
+**Next Steps**:
+1. Run app and check for "🔍 [JarManager]" logs in console
+2. Verify it detects existing Solo jar on relaunch
+3. Expected behavior: Fresh install should create Solo jar, relaunches should skip
 
 #### 7. ℹ️ Minor UX Issues (Non-Blocking)
 **Solo Jar Share UI**:
@@ -971,16 +983,18 @@ OR
 **Priority**: Low - can address in future polish pass
 
 ### Overall Result
-- [x] ✅ PASS - Ready for Phase 9b
-- [ ] ❌ FAIL - Critical issues need fixing
+- [ ] ✅ PASS - Ready for Phase 9b
+- [x] ⚠️ CONDITIONAL PASS - One critical issue needs verification
 
-**Summary**: Core functionality working after bug fixes. Some tests skipped due to infrastructure limitations (TestFlight, multiple accounts), but all testable features pass. Architecture is messy but functional - acceptable for moving to Phase 9b.
+**Summary**: Core functionality working. Memory jar ID bug fixed. Solo jar duplicate creation has enhanced logging - needs testing to verify fix. Jar name color issue deferred to Phase 9b UI redesign. Some tests skipped due to infrastructure limitations (TestFlight, multiple accounts), but all testable features pass. Architecture is messy but functional.
 
-### Blocking Issues (RESOLVED ✅)
+**To Proceed to Phase 9b**: Must verify Solo jar fix works correctly (check console logs on app relaunch).
+
+### Blocking Issues
 1. ✅ Issue #3: Memory jar ID architecture bug - FIXED
-2. ✅ Issue #1: Jar names invisible - FIXED
+2. ⚠️ Issue #1: Jar names color - PARTIAL (deferring to Phase 9b UI overhaul)
 3. ✅ Issue #2: Member names invisible - FIXED
-4. ✅ Issue #6: Solo jar duplicate creation - FIXED
+4. ⚠️ Issue #6: Solo jar duplicate creation - IN PROGRESS (enhanced logging added, needs testing)
 
 ### Non-Blocking Issues
 1. Issue #4: Signature verification failure (pre-existing, investigate later)

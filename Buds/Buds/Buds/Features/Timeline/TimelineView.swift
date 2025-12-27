@@ -52,9 +52,10 @@ struct TimelineView: View {
                 }
             }
             .sheet(isPresented: $viewModel.showCreateSheet, onDismiss: {
-                // Reload memories when create sheet is dismissed
+                // Reload memories and jar stats when create sheet is dismissed
                 Task {
                     await viewModel.loadMemories(jarID: selectedJarID)
+                    await jarManager.loadJars()  // Phase 9b: Reload stats
                 }
             }) {
                 CreateMemoryView(jarID: selectedJarID)
@@ -62,9 +63,10 @@ struct TimelineView: View {
             .sheet(item: $viewModel.selectedMemory) { memory in
                 MemoryDetailView(memory: memory)
                     .onDisappear {
-                        // Reload memories when detail view is dismissed
+                        // Reload memories and jar stats when detail view is dismissed
                         Task {
                             await viewModel.loadMemories(jarID: selectedJarID)
+                            await jarManager.loadJars()  // Phase 9b: Reload stats (in case of delete)
                         }
                     }
             }
