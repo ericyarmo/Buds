@@ -10,10 +10,12 @@ import SwiftUI
 struct ShelfView: View {
     @ObservedObject var jarManager = JarManager.shared  // Only parent observes
     @State private var showingCreateJar = false
+    @State private var showCreateMemory = false
     @State private var jarToDelete: Jar?
     @State private var showDeleteConfirmation = false
     @State private var deleteError: String?
     @State private var showDeleteError = false
+    @State private var toast: Toast?  // Phase 10 Step 5: Toast notifications
 
     private let columns = [
         GridItem(.flexible(), spacing: 16),
@@ -52,6 +54,25 @@ struct ShelfView: View {
             }) {
                 CreateJarView()
             }
+            .sheet(isPresented: $showCreateMemory) {
+                NavigationStack {
+                    JarPickerView()
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    // Phase 10 Step 4: Haptic feedback on FAB tap
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showCreateMemory = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 56))
+                        .foregroundColor(.budsPrimary)
+                        .background(Circle().fill(Color.black).padding(4))
+                        .shadow(radius: 4)
+                }
+                .padding(20)
+            }
             .task {
                 await jarManager.loadJars()
             }
@@ -81,6 +102,7 @@ struct ShelfView: View {
             } message: {
                 Text(deleteError ?? "Failed to delete jar")
             }
+            .toast($toast)  // Phase 10 Step 5: Toast modifier
         }
     }
 
@@ -101,6 +123,8 @@ struct ShelfView: View {
                             Button(role: .destructive) {
                                 jarToDelete = jar
                                 showDeleteConfirmation = true
+                                // Phase 10 Step 4: Haptic feedback for destructive action
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             } label: {
                                 Label("Delete Jar", systemImage: "trash")
                             }
@@ -109,6 +133,12 @@ struct ShelfView: View {
                 }
             }
             .padding()
+        }
+        .refreshable {
+            // Phase 10 Step 4: Pull-to-refresh
+            await jarManager.refreshGlobal()
+            // Haptic feedback on refresh complete
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
 
@@ -155,8 +185,16 @@ struct ShelfView: View {
     private func deleteJar(_ jar: Jar) async {
         do {
             try await jarManager.deleteJar(id: jar.id)
-            await jarManager.loadJars()  // Reload to update UI
             jarToDelete = nil
+
+            // Phase 10 Step 5: Toast notification on success
+            await MainActor.run {
+                withAnimation {
+                    toast = Toast(message: "Jar deleted", style: .success)
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+
             print("✅ Jar deleted and UI updated")
         } catch let error as JarError {
             deleteError = error.localizedDescription

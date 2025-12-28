@@ -2,7 +2,7 @@
 //  JarDetailView.swift
 //  Buds
 //
-//  Shows members of a jar with add/remove actions
+//  Shows buds/memories in a jar (Phase 10: converted from members view)
 //
 
 import SwiftUI
@@ -10,10 +10,13 @@ import SwiftUI
 struct JarDetailView: View {
     let jar: Jar
 
+    @State private var memoryItems: [MemoryListItem] = []
     @State private var members: [JarMember] = []
     @State private var showingAddMember = false
     @State private var showingMemberDetail: JarMember?
+    @State private var selectedMemoryID: UUID?
     @State private var isLoading = false
+    @State private var showMembersSheet = false
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -23,14 +26,113 @@ struct JarDetailView: View {
             if isLoading {
                 ProgressView()
                     .tint(.budsPrimary)
-            } else if members.isEmpty {
-                emptyState
+            } else if memoryItems.isEmpty {
+                emptyMemoriesState
             } else {
-                membersList
+                memoriesList
             }
         }
         .navigationTitle(jar.name)
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    NavigationLink(destination: CreateMemoryView(jarID: jar.id)) {
+                        Label("Add Bud", systemImage: "plus.circle")
+                    }
+
+                    Button {
+                        showMembersSheet = true
+                    } label: {
+                        Label("Manage Members", systemImage: "person.2")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundColor(.budsPrimary)
+                }
+            }
+        }
+        .sheet(isPresented: $showMembersSheet) {
+            NavigationStack {
+                membersView
+            }
+        }
+        .task {
+            await loadMemories()
+            await loadMembers()
+        }
+    }
+
+    // MARK: - Memories Empty State (Step 1.4)
+
+    private var emptyMemoriesState: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "leaf")
+                .font(.system(size: 80))
+                .foregroundColor(.budsPrimary.opacity(0.3))
+
+            VStack(spacing: 12) {
+                Text("No buds yet")
+                    .font(.budsTitle)
+                    .foregroundColor(.white)
+
+                Text("Start logging your cannabis experiences")
+                    .font(.budsBody)
+                    .foregroundColor(.budsTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            NavigationLink(destination: CreateMemoryView(jarID: jar.id)) {
+                HStack {
+                    Image(systemName: "plus.circle")
+                    Text("Add Your First Bud")
+                }
+                .font(.budsBodyBold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color.budsPrimary)
+                .cornerRadius(12)
+            }
+        }
+        .padding(.vertical, 40)
+    }
+
+    // MARK: - Memories List (Phase 10 Step 2.4)
+
+    private var memoriesList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(memoryItems) { item in
+                    MemoryListCard(item: item) {
+                        // TODO: Navigate to memory detail view when tapped
+                        // For now, just print
+                        print("Tapped memory: \(item.strainName)")
+                    }
+                }
+            }
+            .padding()
+        }
+        .refreshable {
+            await loadMemories()
+        }
+    }
+
+    // MARK: - Members View (in sheet)
+
+    private var membersView: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            if members.isEmpty {
+                emptyMembersState
+            } else {
+                membersList
+            }
+        }
+        .navigationTitle("Members")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -53,14 +155,9 @@ struct JarDetailView: View {
                     Task { await loadMembers() }
                 }
         }
-        .task {
-            await loadMembers()
-        }
     }
 
-    // MARK: - Empty State
-
-    private var emptyState: some View {
+    private var emptyMembersState: some View {
         VStack(spacing: 24) {
             Image(systemName: "person.2.circle")
                 .font(.system(size: 80))
@@ -96,8 +193,6 @@ struct JarDetailView: View {
         .padding()
     }
 
-    // MARK: - Members List
-
     private var membersList: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -130,10 +225,20 @@ struct JarDetailView: View {
 
     // MARK: - Helpers
 
-    private func loadMembers() async {
+    private func loadMemories() async {
         isLoading = true
         defer { isLoading = false }
 
+        do {
+            let repository = MemoryRepository()
+            memoryItems = try await repository.fetchLightweightList(jarID: jar.id, limit: 50)
+            print("✅ Loaded \(memoryItems.count) memories for jar \(jar.name)")
+        } catch {
+            print("❌ Failed to load memories: \(error)")
+        }
+    }
+
+    private func loadMembers() async {
         do {
             members = try await JarRepository.shared.getMembers(jarID: jar.id)
             print("✅ Loaded \(members.count) members for jar \(jar.name)")

@@ -27,7 +27,9 @@ class JarManager: ObservableObject {
 
     // MARK: - Jar Operations
 
-    func loadJars() async {
+    /// TIER 1: Full reload (jar create/delete, member changes, inbox receive)
+    /// Phase 10 Step 3: Split refresh logic for performance
+    func refreshGlobal() async {
         isLoading = true
         defer { isLoading = false }
 
@@ -41,10 +43,41 @@ class JarManager: ObservableObject {
             self.jars = loadedJars
             self.jarStats = loadedStats
 
-            print("✅ Loaded \(jars.count) jars with stats")
+            print("✅ Global refresh: \(jars.count) jars")
         } catch {
-            print("❌ Failed to load jars: \(error)")
+            print("❌ Failed global refresh: \(error)")
         }
+    }
+
+    /// TIER 2: Lightweight (bud create/delete, single jar affected)
+    /// Phase 10 Step 3: Only updates stats for one jar
+    func refreshJar(_ jarID: String) async {
+        do {
+            // Only update stats for this one jar
+            let allStats = try await MemoryRepository().fetchAllJarStats()
+
+            if let updatedStat = allStats[jarID] {
+                self.jarStats[jarID] = updatedStat
+            } else {
+                // Jar might be empty now
+                self.jarStats[jarID] = JarStats(
+                    jarID: jarID,
+                    totalBuds: 0,
+                    recentBuds: 0,
+                    lastCreatedAt: nil
+                )
+            }
+
+            print("✅ Refreshed jar: \(jarID)")
+        } catch {
+            print("❌ Failed to refresh jar: \(error)")
+        }
+    }
+
+    /// Backward compatibility: keep loadJars() as alias to refreshGlobal()
+    /// TODO: Remove after updating all call sites
+    func loadJars() async {
+        await refreshGlobal()
     }
 
     func createJar(name: String, description: String? = nil) async throws -> Jar {
@@ -56,14 +89,16 @@ class JarManager: ObservableObject {
             ownerDID: currentDID
         )
 
-        await loadJars()
+        // Phase 10 Step 3: Structural change requires global refresh
+        await refreshGlobal()
         print("✅ Created jar: \(name)")
         return jar
     }
 
     func deleteJar(id: String) async throws {
         try await JarRepository.shared.deleteJar(id: id)
-        await loadJars()
+        // Phase 10 Step 3: Structural change requires global refresh
+        await refreshGlobal()
         print("✅ Deleted jar: \(id)")
     }
 
@@ -96,7 +131,7 @@ class JarManager: ObservableObject {
             ownerDID: currentDID
         )
 
-        await loadJars()
+        await refreshGlobal()
         print("✅ Created Solo jar for fresh install")
     }
 

@@ -12,6 +12,14 @@
 		5893A3A82EFE813E001F310F /* CreateJarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3A52EFE813E001F310F /* CreateJarView.swift */; };
 		5893A3AC2EFF49F3001F310F /* ShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3AA2EFF49F3001F310F /* ShelfView.swift */; };
 		5893A3AD2EFF49F3001F310F /* ShelfJarCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3A92EFF49F3001F310F /* ShelfJarCard.swift */; };
+		5893A3B02F01A835001F310F /* E2EEVerificationTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3AE2F01A835001F310F /* E2EEVerificationTest.swift */; };
+		5893A3B32F01A84A001F310F /* E2EETestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3B12F01A84A001F310F /* E2EETestView.swift */; };
+		5893A3B72F01C98D001F310F /* JarMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3B52F01C98D001F310F /* JarMember.swift */; };
+		5893A3B82F01C98D001F310F /* Jar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3B42F01C98D001F310F /* Jar.swift */; };
+		5893A3B92F01C98D001F310F /* MemoryListItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3B62F01C98D001F310F /* MemoryListItem.swift */; };
+		5893A3BF2F01C9D9001F310F /* Toast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3BE2F01C9D9001F310F /* Toast.swift */; };
+		5893A3C12F01CD82001F310F /* JarPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3C02F01CD81001F310F /* JarPickerView.swift */; };
+		5893A3C32F01CE97001F310F /* MemoryListCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3C22F01CE97001F310F /* MemoryListCard.swift */; };
 		58FFD94B2EF2900D00C0A7DB /* Info-Template.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD93F2EF2900D00C0A7DB /* Info-Template.plist */; };
 		58FFD94C2EF2900D00C0A7DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD9492EF2900D00C0A7DB /* Assets.xcassets */; };
 		58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9282EF2900D00C0A7DB /* BudsApp.swift */; };
@@ -58,8 +66,6 @@
 		58FFD9AF2EFCD9F200C0A7DB /* CBORDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9AE2EFCD9F200C0A7DB /* CBORDecoder.swift */; };
 		58FFD9B12EFCDA2400C0A7DB /* EncryptedMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B02EFCDA2400C0A7DB /* EncryptedMessage.swift */; };
 		58FFD9B32EFE20C600C0A7DB /* JarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B22EFE20C600C0A7DB /* JarManager.swift */; };
-		58FFD9B62EFE20DE00C0A7DB /* Jar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B42EFE20DE00C0A7DB /* Jar.swift */; };
-		58FFD9B72EFE20DE00C0A7DB /* JarMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B52EFE20DE00C0A7DB /* JarMember.swift */; };
 		58FFD9B92EFE20E900C0A7DB /* JarRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9B82EFE20E900C0A7DB /* JarRepository.swift */; };
 /* End PBXBuildFile section */
 
@@ -86,6 +92,14 @@
 		5893A3A62EFE813E001F310F /* JarDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarDetailView.swift; sourceTree = "<group>"; };
 		5893A3A92EFF49F3001F310F /* ShelfJarCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfJarCard.swift; sourceTree = "<group>"; };
 		5893A3AA2EFF49F3001F310F /* ShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
+		5893A3AE2F01A835001F310F /* E2EEVerificationTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEVerificationTest.swift; sourceTree = "<group>"; };
+		5893A3B12F01A84A001F310F /* E2EETestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EETestView.swift; sourceTree = "<group>"; };
+		5893A3B42F01C98D001F310F /* Jar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Jar.swift; sourceTree = "<group>"; };
+		5893A3B52F01C98D001F310F /* JarMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarMember.swift; sourceTree = "<group>"; };
+		5893A3B62F01C98D001F310F /* MemoryListItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryListItem.swift; sourceTree = "<group>"; };
+		5893A3BE2F01C9D9001F310F /* Toast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Toast.swift; sourceTree = "<group>"; };
+		5893A3C02F01CD81001F310F /* JarPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarPickerView.swift; sourceTree = "<group>"; };
+		5893A3C22F01CE97001F310F /* MemoryListCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryListCard.swift; sourceTree = "<group>"; };
 		58FFD8C92EF28ECE00C0A7DB /* Buds.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Buds.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8D62EF28ED100C0A7DB /* BudsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8E02EF28ED100C0A7DB /* BudsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -133,8 +147,6 @@
 		58FFD9AE2EFCD9F200C0A7DB /* CBORDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBORDecoder.swift; sourceTree = "<group>"; };
 		58FFD9B02EFCDA2400C0A7DB /* EncryptedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptedMessage.swift; sourceTree = "<group>"; };
 		58FFD9B22EFE20C600C0A7DB /* JarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarManager.swift; sourceTree = "<group>"; };
-		58FFD9B42EFE20DE00C0A7DB /* Jar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Jar.swift; sourceTree = "<group>"; };
-		58FFD9B52EFE20DE00C0A7DB /* JarMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarMember.swift; sourceTree = "<group>"; };
 		58FFD9B82EFE20E900C0A7DB /* JarRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarRepository.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -186,6 +198,22 @@
 				5893A3AA2EFF49F3001F310F /* ShelfView.swift */,
 			);
 			path = Shelf;
+			sourceTree = "<group>";
+		};
+		5893A3AF2F01A835001F310F /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				5893A3AE2F01A835001F310F /* E2EEVerificationTest.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		5893A3B22F01A84A001F310F /* Debug */ = {
+			isa = PBXGroup;
+			children = (
+				5893A3B12F01A84A001F310F /* E2EETestView.swift */,
+			);
+			path = Debug;
 			sourceTree = "<group>";
 		};
 		58FFD8C02EF28ECE00C0A7DB = {
@@ -251,6 +279,9 @@
 		58FFD9372EF2900D00C0A7DB /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3B42F01C98D001F310F /* Jar.swift */,
+				5893A3B52F01C98D001F310F /* JarMember.swift */,
+				5893A3B62F01C98D001F310F /* MemoryListItem.swift */,
 				58FFD9B02EFCDA2400C0A7DB /* EncryptedMessage.swift */,
 				58FFD9922EF71BFE00C0A7DB /* CircleMember.swift */,
 				58FFD9932EF71BFE00C0A7DB /* Device.swift */,
@@ -263,8 +294,6 @@
 		58FFD9382EF2900D00C0A7DB /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				58FFD9B42EFE20DE00C0A7DB /* Jar.swift */,
-				58FFD9B52EFE20DE00C0A7DB /* JarMember.swift */,
 				58FFD9B22EFE20C600C0A7DB /* JarManager.swift */,
 				58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */,
 				58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */,
@@ -283,6 +312,7 @@
 		58FFD93A2EF2900D00C0A7DB /* CreateMemory */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3C02F01CD81001F310F /* JarPickerView.swift */,
 				58FFD9772EF345DB00C0A7DB /* PhotoPicker.swift */,
 				58FFD9392EF2900D00C0A7DB /* CreateMemoryView.swift */,
 			);
@@ -301,6 +331,7 @@
 		58FFD93E2EF2900D00C0A7DB /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3B22F01A84A001F310F /* Debug */,
 				5893A3AB2EFF49F3001F310F /* Shelf */,
 				58FFD9AA2EFA2E6600C0A7DB /* Share */,
 				58FFD99B2EF71C2900C0A7DB /* Circle */,
@@ -344,6 +375,7 @@
 		58FFD9482EF2900D00C0A7DB /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3BE2F01C9D9001F310F /* Toast.swift */,
 				5893A3A32EFE8129001F310F /* JarCard.swift */,
 				58FFD9442EF2900D00C0A7DB /* Utilities */,
 				58FFD9472EF2900D00C0A7DB /* Views */,
@@ -354,6 +386,7 @@
 		58FFD94A2EF2900D00C0A7DB /* Buds */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3AF2F01A835001F310F /* Tests */,
 				58FFD9852EF4A19C00C0A7DB /* Buds.entitlements */,
 				58FFD9292EF2900D00C0A7DB /* App */,
 				58FFD9382EF2900D00C0A7DB /* Core */,
@@ -385,6 +418,7 @@
 		58FFD99B2EF71C2900C0A7DB /* Circle */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3C22F01CE97001F310F /* MemoryListCard.swift */,
 				5893A3A52EFE813E001F310F /* CreateJarView.swift */,
 				5893A3A62EFE813E001F310F /* JarDetailView.swift */,
 				58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */,
@@ -557,12 +591,15 @@
 				58FFD9892EF4BB2800C0A7DB /* AuthManager.swift in Sources */,
 				58FFD9942EF71BFE00C0A7DB /* CircleMember.swift in Sources */,
 				58FFD9A12EFA2DF900C0A7DB /* ShareManager.swift in Sources */,
+				5893A3C12F01CD82001F310F /* JarPickerView.swift in Sources */,
 				58FFD9AD2EFC945600C0A7DB /* InboxManager.swift in Sources */,
+				5893A3B72F01C98D001F310F /* JarMember.swift in Sources */,
+				5893A3B82F01C98D001F310F /* Jar.swift in Sources */,
+				5893A3B92F01C98D001F310F /* MemoryListItem.swift in Sources */,
+				5893A3B02F01A835001F310F /* E2EEVerificationTest.swift in Sources */,
 				58FFD9A22EFA2DF900C0A7DB /* RelayClient.swift in Sources */,
 				58FFD9952EF71BFE00C0A7DB /* Device.swift in Sources */,
 				58FFD94E2EF2900D00C0A7DB /* CBORCanonical.swift in Sources */,
-				58FFD9B62EFE20DE00C0A7DB /* Jar.swift in Sources */,
-				58FFD9B72EFE20DE00C0A7DB /* JarMember.swift in Sources */,
 				58FFD94F2EF2900D00C0A7DB /* CBOREncoder.swift in Sources */,
 				5893A3A42EFE8129001F310F /* JarCard.swift in Sources */,
 				58FFD9502EF2900D00C0A7DB /* CBORValue.swift in Sources */,
@@ -577,6 +614,7 @@
 				58FFD9A52EFA2E2B00C0A7DB /* DeviceManager.swift in Sources */,
 				58FFD9B12EFCDA2400C0A7DB /* EncryptedMessage.swift in Sources */,
 				5893A3A72EFE813E001F310F /* JarDetailView.swift in Sources */,
+				5893A3B32F01A84A001F310F /* E2EETestView.swift in Sources */,
 				5893A3A82EFE813E001F310F /* CreateJarView.swift in Sources */,
 				58FFD9A62EFA2E2B00C0A7DB /* E2EEManager.swift in Sources */,
 				58FFD9572EF2900D00C0A7DB /* UCRHeader.swift in Sources */,
@@ -587,7 +625,9 @@
 				58FFD97C2EF3462500C0A7DB /* MemoryDetailView.swift in Sources */,
 				58FFD9AF2EFCD9F200C0A7DB /* CBORDecoder.swift in Sources */,
 				58FFD95B2EF2900D00C0A7DB /* Colors.swift in Sources */,
+				5893A3C32F01CE97001F310F /* MemoryListCard.swift in Sources */,
 				5893A3AC2EFF49F3001F310F /* ShelfView.swift in Sources */,
+				5893A3BF2F01C9D9001F310F /* Toast.swift in Sources */,
 				5893A3AD2EFF49F3001F310F /* ShelfJarCard.swift in Sources */,
 				58FFD95C2EF2900D00C0A7DB /* Spacing.swift in Sources */,
 				58FFD99C2EF71C2900C0A7DB /* MemberDetailView.swift in Sources */,

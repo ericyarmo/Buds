@@ -21,6 +21,10 @@ struct MemoryRepository {
     private let db = Database.shared
     private let receiptManager = ReceiptManager.shared
 
+    // Phase 10 Step 2.2: Decode cache to avoid repeated JSON parsing
+    private static var decodeCache: [String: SessionPayload] = [:]
+    private static let cacheLock = NSLock()
+
     // MARK: - Fetch
 
     /// Fetch all memories (most recent first)
@@ -140,6 +144,71 @@ struct MemoryRepository {
                 )
             }
             return stats
+        }
+    }
+
+    /// Fetch lightweight memory list (Phase 10 Step 2.2)
+    /// Uses decode cache to avoid repeated JSON parsing
+    func fetchLightweightList(jarID: String, limit: Int = 50) async throws -> [MemoryListItem] {
+        try await db.readAsync { db in
+            let sql = """
+                SELECT
+                    lr.uuid,
+                    h.cid,
+                    h.payload_json,
+                    h.received_at,
+                    lr.image_cids,
+                    lr.jar_id
+                FROM local_receipts lr
+                JOIN ucr_headers h ON lr.header_cid = h.cid
+                WHERE h.receipt_type = ? AND lr.jar_id = ?
+                ORDER BY h.received_at DESC
+                LIMIT ?
+                """
+
+            let rows = try Row.fetchAll(db, sql: sql, arguments: [ReceiptType.sessionCreated, jarID, limit])
+
+            return rows.compactMap { row in
+                let cid = row["cid"] as String
+                let payloadJSON = row["payload_json"] as String
+
+                // Check cache first
+                let payload: SessionPayload
+                Self.cacheLock.lock()
+                if let cached = Self.decodeCache[cid] {
+                    payload = cached
+                    Self.cacheLock.unlock()
+                } else {
+                    Self.cacheLock.unlock()
+
+                    // Decode and cache
+                    guard let data = payloadJSON.data(using: .utf8),
+                          let decoded = try? JSONDecoder().decode(SessionPayload.self, from: data) else {
+                        return nil
+                    }
+                    payload = decoded
+
+                    Self.cacheLock.lock()
+                    Self.decodeCache[cid] = decoded
+                    Self.cacheLock.unlock()
+                }
+
+                // Get first image CID if available
+                let imageCIDsJSON = (row["image_cids"] as? String) ?? "[]"
+                let imageCIDs = (try? JSONDecoder().decode([String].self, from: imageCIDsJSON.data(using: .utf8)!)) ?? []
+                let thumbnailCID = imageCIDs.first
+
+                // Build lightweight item
+                return MemoryListItem(
+                    id: UUID(uuidString: row["uuid"] as String) ?? UUID(),
+                    strainName: payload.productName,
+                    productType: ProductType(rawValue: payload.productType) ?? .other,
+                    rating: payload.rating,
+                    createdAt: Date(timeIntervalSince1970: row["received_at"] as Double),
+                    thumbnailCID: thumbnailCID,
+                    jarID: row["jar_id"] as String
+                )
+            }
         }
     }
 

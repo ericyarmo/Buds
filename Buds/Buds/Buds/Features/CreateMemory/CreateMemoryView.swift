@@ -13,6 +13,7 @@ struct CreateMemoryView: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: CreateMemoryViewModel
+    @State private var toast: Toast?  // Phase 10 Step 5: Toast for success
 
     init(jarID: String = "solo") {
         self.jarID = jarID
@@ -148,8 +149,16 @@ struct CreateMemoryView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         Task {
-                            await viewModel.save()
-                            dismiss()
+                            let success = await viewModel.save()
+                            if success {
+                                // Phase 10 Step 5: Toast on success
+                                toast = Toast(message: "Bud added!", style: .success)
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
+
+                                // Delay dismiss slightly to show toast
+                                try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5s
+                                dismiss()
+                            }
                         }
                     }
                     .font(.budsBodyBold)
@@ -161,6 +170,13 @@ struct CreateMemoryView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "Unknown error")
             }
+            .onDisappear {
+                Task {
+                    // Phase 10 Step 3: Lightweight refresh for single jar
+                    await JarManager.shared.refreshJar(jarID)
+                }
+            }
+            .toast($toast)  // Phase 10 Step 5: Toast modifier
         }
     }
 
@@ -227,7 +243,7 @@ final class CreateMemoryViewModel: ObservableObject {
         }
     }
 
-    func save() async {
+    func save() async -> Bool {
         do {
             print("💾 CreateMemory: Saving memory with \(selectedImages.count) images")
             for (index, imageData) in selectedImages.enumerated() {
@@ -259,10 +275,12 @@ final class CreateMemoryViewModel: ObservableObject {
             }
 
             print("✅ Memory created successfully with \(selectedImages.count) images")
+            return true
         } catch {
             print("❌ Failed to create memory: \(error)")
             errorMessage = error.localizedDescription
             showError = true
+            return false
         }
     }
 }

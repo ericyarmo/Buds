@@ -40,6 +40,9 @@ struct ProfileView: View {
                     // App info
                     appInfoSection
 
+                    // Debug section (Phase 10 testing)
+                    debugSection
+
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 20)
@@ -300,6 +303,50 @@ struct ProfileView: View {
             Text("Buds v0.1 - Private cannabis memory sharing for you and your circle. Built on ChaingeOS principles.")
                 .font(.budsCaption)
                 .foregroundColor(.budsTextSecondary)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    // MARK: - Debug Section (Phase 10 Testing)
+
+    private var debugSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SectionHeader(title: "Debug & Testing", icon: "wrench.and.screwdriver.fill")
+
+            VStack(spacing: 12) {
+                // E2EE Verification Test
+                NavigationLink(destination: E2EETestView()) {
+                    HStack {
+                        Image(systemName: "checkmark.shield.fill")
+                            .foregroundColor(.orange)
+                            .frame(width: 24)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("E2EE Verification Test")
+                                .font(.budsBody)
+                                .foregroundColor(.budsText)
+
+                            Text("Critical test for TestFlight readiness")
+                                .font(.budsCaption)
+                                .foregroundColor(.budsTextSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color.budsCard)
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text("⚠️ Run E2EE test before TestFlight upload")
+                .font(.budsCaption)
+                .foregroundColor(.orange)
                 .padding(.horizontal, 4)
         }
     }
