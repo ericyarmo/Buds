@@ -36,28 +36,27 @@ struct ImageCarousel: View {
             // Multiple images - show carousel with ScrollView instead of TabView
             return AnyView(
                 VStack(spacing: 8) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 0) {
-                            ForEach(Array(images.enumerated()), id: \.offset) { index, imageData in
-                                GeometryReader { geometry in
+                    GeometryReader { geo in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 0) {
+                                ForEach(Array(images.enumerated()), id: \.offset) { index, imageData in
                                     carouselImage(imageData)
-                                        .frame(width: geometry.size.width)
+                                        .frame(width: geo.size.width)
                                         .id(index)
                                 }
-                                .containerRelativeFrame(.horizontal)
+                            }
+                            .scrollTargetLayout()
+                        }
+                        .scrollPosition(id: $scrollPosition)
+                        .scrollTargetBehavior(.paging)
+                        .onChange(of: scrollPosition) { _, newValue in
+                            if let index = newValue {
+                                currentIndex = index
+                                print("🎠 ImageCarousel: Scrolled to index \(index)")
                             }
                         }
-                        .scrollTargetLayout()
                     }
-                    .scrollPosition(id: $scrollPosition)
-                    .scrollTargetBehavior(.paging)
                     .frame(height: maxHeight)
-                    .onChange(of: scrollPosition) { _, newValue in
-                        if let index = newValue {
-                            currentIndex = index
-                            print("🎠 ImageCarousel: Scrolled to index \(index)")
-                        }
-                    }
 
                     // Page indicator dots
                     pageIndicator
@@ -72,15 +71,18 @@ struct ImageCarousel: View {
         if let uiImage = UIImage(data: imageData) {
             let _ = print("🎠 ImageCarousel: Successfully created UIImage, size: \(uiImage.size)")
             return AnyView(
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: maxHeight)
-                    .clipped()
-                    .cornerRadius(cornerRadius)
-                    .onTapGesture {
-                        onTap?()
-                    }
+                GeometryReader { geo in
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geo.size.width, height: maxHeight)
+                        .clipped()
+                        .cornerRadius(cornerRadius)
+                        .onTapGesture {
+                            onTap?()
+                        }
+                }
+                .frame(height: maxHeight)
             )
         } else {
             let _ = print("❌ ImageCarousel: Failed to create UIImage from \(imageData.count) bytes")
@@ -100,9 +102,8 @@ struct ImageCarousel: View {
             return AnyView(
                 Image(uiImage: uiImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: maxHeight)
-                    .clipped()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxHeight: maxHeight)
                     .cornerRadius(cornerRadius)
                     .onTapGesture {
                         onTap?()

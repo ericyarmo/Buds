@@ -20,6 +20,17 @@
 		5893A3BF2F01C9D9001F310F /* Toast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3BE2F01C9D9001F310F /* Toast.swift */; };
 		5893A3C12F01CD82001F310F /* JarPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3C02F01CD81001F310F /* JarPickerView.swift */; };
 		5893A3C32F01CE97001F310F /* MemoryListCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3C22F01CE97001F310F /* MemoryListCard.swift */; };
+		5893A3CA2F02119D001F310F /* DataResetUtility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3C92F02119D001F310F /* DataResetUtility.swift */; };
+		5893A3CC2F021E8A001F310F /* EditMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3CB2F021E8A001F310F /* EditMemoryView.swift */; };
+		5893A3CE2F021E9E001F310F /* EditMemoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3CD2F021E9E001F310F /* EditMemoryViewModel.swift */; };
+		5893A3D02F0279BD001F310F /* Reaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3CF2F0279BD001F310F /* Reaction.swift */; };
+		5893A3D22F0279CA001F310F /* ReactionRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3D12F0279CA001F310F /* ReactionRepository.swift */; };
+		5893A3D52F0279D9001F310F /* ReactionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3D32F0279D9001F310F /* ReactionPicker.swift */; };
+		5893A3D62F0279D9001F310F /* ReactionSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3D42F0279D9001F310F /* ReactionSummary.swift */; };
+		5893A3D82F027CD6001F310F /* MoveMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3D72F027CD6001F310F /* MoveMemoryView.swift */; };
+		5893A3DB2F028197001F310F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3D92F028197001F310F /* OnboardingView.swift */; };
+		5893A3E12F032036001F310F /* StressTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3E02F032036001F310F /* StressTestView.swift */; };
+		5893A3E22F032036001F310F /* StressTestGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3DF2F032036001F310F /* StressTestGenerator.swift */; };
 		58FFD94B2EF2900D00C0A7DB /* Info-Template.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD93F2EF2900D00C0A7DB /* Info-Template.plist */; };
 		58FFD94C2EF2900D00C0A7DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD9492EF2900D00C0A7DB /* Assets.xcassets */; };
 		58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9282EF2900D00C0A7DB /* BudsApp.swift */; };
@@ -55,7 +66,6 @@
 		58FFD9952EF71BFE00C0A7DB /* Device.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9932EF71BFE00C0A7DB /* Device.swift */; };
 		58FFD9972EF71C1100C0A7DB /* CircleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9962EF71C1100C0A7DB /* CircleManager.swift */; };
 		58FFD99C2EF71C2900C0A7DB /* MemberDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */; };
-		58FFD99D2EF71C2900C0A7DB /* CircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9992EF71C2900C0A7DB /* CircleView.swift */; };
 		58FFD99E2EF71C2900C0A7DB /* AddMemberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */; };
 		58FFD9A12EFA2DF900C0A7DB /* ShareManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9A02EFA2DF900C0A7DB /* ShareManager.swift */; };
 		58FFD9A22EFA2DF900C0A7DB /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD99F2EFA2DF900C0A7DB /* RelayClient.swift */; };
@@ -100,6 +110,17 @@
 		5893A3BE2F01C9D9001F310F /* Toast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Toast.swift; sourceTree = "<group>"; };
 		5893A3C02F01CD81001F310F /* JarPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarPickerView.swift; sourceTree = "<group>"; };
 		5893A3C22F01CE97001F310F /* MemoryListCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryListCard.swift; sourceTree = "<group>"; };
+		5893A3C92F02119D001F310F /* DataResetUtility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataResetUtility.swift; sourceTree = "<group>"; };
+		5893A3CB2F021E8A001F310F /* EditMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditMemoryView.swift; sourceTree = "<group>"; };
+		5893A3CD2F021E9E001F310F /* EditMemoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditMemoryViewModel.swift; sourceTree = "<group>"; };
+		5893A3CF2F0279BD001F310F /* Reaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reaction.swift; sourceTree = "<group>"; };
+		5893A3D12F0279CA001F310F /* ReactionRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReactionRepository.swift; sourceTree = "<group>"; };
+		5893A3D32F0279D9001F310F /* ReactionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReactionPicker.swift; sourceTree = "<group>"; };
+		5893A3D42F0279D9001F310F /* ReactionSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReactionSummary.swift; sourceTree = "<group>"; };
+		5893A3D72F027CD6001F310F /* MoveMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveMemoryView.swift; sourceTree = "<group>"; };
+		5893A3D92F028197001F310F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		5893A3DF2F032036001F310F /* StressTestGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTestGenerator.swift; sourceTree = "<group>"; };
+		5893A3E02F032036001F310F /* StressTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTestView.swift; sourceTree = "<group>"; };
 		58FFD8C92EF28ECE00C0A7DB /* Buds.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Buds.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8D62EF28ED100C0A7DB /* BudsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8E02EF28ED100C0A7DB /* BudsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -136,7 +157,6 @@
 		58FFD9932EF71BFE00C0A7DB /* Device.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Device.swift; sourceTree = "<group>"; };
 		58FFD9962EF71C1100C0A7DB /* CircleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleManager.swift; sourceTree = "<group>"; };
 		58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMemberView.swift; sourceTree = "<group>"; };
-		58FFD9992EF71C2900C0A7DB /* CircleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleView.swift; sourceTree = "<group>"; };
 		58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberDetailView.swift; sourceTree = "<group>"; };
 		58FFD99F2EFA2DF900C0A7DB /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
 		58FFD9A02EFA2DF900C0A7DB /* ShareManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareManager.swift; sourceTree = "<group>"; };
@@ -211,9 +231,30 @@
 		5893A3B22F01A84A001F310F /* Debug */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3DF2F032036001F310F /* StressTestGenerator.swift */,
+				5893A3E02F032036001F310F /* StressTestView.swift */,
 				5893A3B12F01A84A001F310F /* E2EETestView.swift */,
 			);
 			path = Debug;
+			sourceTree = "<group>";
+		};
+		5893A3C72F020B54001F310F /* Memory */ = {
+			isa = PBXGroup;
+			children = (
+				5893A3D72F027CD6001F310F /* MoveMemoryView.swift */,
+				5893A3D32F0279D9001F310F /* ReactionPicker.swift */,
+				5893A3D42F0279D9001F310F /* ReactionSummary.swift */,
+				5893A3CD2F021E9E001F310F /* EditMemoryViewModel.swift */,
+			);
+			path = Memory;
+			sourceTree = "<group>";
+		};
+		5893A3DA2F028197001F310F /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				5893A3D92F028197001F310F /* OnboardingView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 		58FFD8C02EF28ECE00C0A7DB = {
@@ -261,6 +302,7 @@
 		58FFD9322EF2900D00C0A7DB /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3D12F0279CA001F310F /* ReactionRepository.swift */,
 				58FFD9B82EFE20E900C0A7DB /* JarRepository.swift */,
 				58FFD9312EF2900D00C0A7DB /* MemoryRepository.swift */,
 			);
@@ -279,6 +321,7 @@
 		58FFD9372EF2900D00C0A7DB /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3CF2F0279BD001F310F /* Reaction.swift */,
 				5893A3B42F01C98D001F310F /* Jar.swift */,
 				5893A3B52F01C98D001F310F /* JarMember.swift */,
 				5893A3B62F01C98D001F310F /* MemoryListItem.swift */,
@@ -294,6 +337,7 @@
 		58FFD9382EF2900D00C0A7DB /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3C92F02119D001F310F /* DataResetUtility.swift */,
 				58FFD9B22EFE20C600C0A7DB /* JarManager.swift */,
 				58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */,
 				58FFD9A32EFA2E2B00C0A7DB /* DeviceManager.swift */,
@@ -331,6 +375,9 @@
 		58FFD93E2EF2900D00C0A7DB /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3DA2F028197001F310F /* Onboarding */,
+				5893A3CB2F021E8A001F310F /* EditMemoryView.swift */,
+				5893A3C72F020B54001F310F /* Memory */,
 				5893A3B22F01A84A001F310F /* Debug */,
 				5893A3AB2EFF49F3001F310F /* Shelf */,
 				58FFD9AA2EFA2E6600C0A7DB /* Share */,
@@ -422,7 +469,6 @@
 				5893A3A52EFE813E001F310F /* CreateJarView.swift */,
 				5893A3A62EFE813E001F310F /* JarDetailView.swift */,
 				58FFD9982EF71C2900C0A7DB /* AddMemberView.swift */,
-				58FFD9992EF71C2900C0A7DB /* CircleView.swift */,
 				58FFD99A2EF71C2900C0A7DB /* MemberDetailView.swift */,
 			);
 			path = Circle;
@@ -595,6 +641,7 @@
 				58FFD9AD2EFC945600C0A7DB /* InboxManager.swift in Sources */,
 				5893A3B72F01C98D001F310F /* JarMember.swift in Sources */,
 				5893A3B82F01C98D001F310F /* Jar.swift in Sources */,
+				5893A3CC2F021E8A001F310F /* EditMemoryView.swift in Sources */,
 				5893A3B92F01C98D001F310F /* MemoryListItem.swift in Sources */,
 				5893A3B02F01A835001F310F /* E2EEVerificationTest.swift in Sources */,
 				58FFD9A22EFA2DF900C0A7DB /* RelayClient.swift in Sources */,
@@ -603,6 +650,7 @@
 				58FFD94F2EF2900D00C0A7DB /* CBOREncoder.swift in Sources */,
 				5893A3A42EFE8129001F310F /* JarCard.swift in Sources */,
 				58FFD9502EF2900D00C0A7DB /* CBORValue.swift in Sources */,
+				5893A3D22F0279CA001F310F /* ReactionRepository.swift in Sources */,
 				58FFD98C2EF4BBA300C0A7DB /* PhoneAuthView.swift in Sources */,
 				58FFD9512EF2900D00C0A7DB /* IdentityManager.swift in Sources */,
 				58FFD98F2EF4BBB600C0A7DB /* ProfileView.swift in Sources */,
@@ -612,7 +660,11 @@
 				58FFD9552EF2900D00C0A7DB /* Database.swift in Sources */,
 				58FFD9562EF2900D00C0A7DB /* Memory.swift in Sources */,
 				58FFD9A52EFA2E2B00C0A7DB /* DeviceManager.swift in Sources */,
+				5893A3CA2F02119D001F310F /* DataResetUtility.swift in Sources */,
 				58FFD9B12EFCDA2400C0A7DB /* EncryptedMessage.swift in Sources */,
+				5893A3D52F0279D9001F310F /* ReactionPicker.swift in Sources */,
+				5893A3D62F0279D9001F310F /* ReactionSummary.swift in Sources */,
+				5893A3CE2F021E9E001F310F /* EditMemoryViewModel.swift in Sources */,
 				5893A3A72EFE813E001F310F /* JarDetailView.swift in Sources */,
 				5893A3B32F01A84A001F310F /* E2EETestView.swift in Sources */,
 				5893A3A82EFE813E001F310F /* CreateJarView.swift in Sources */,
@@ -622,16 +674,20 @@
 				58FFD9582EF2900D00C0A7DB /* CreateMemoryView.swift in Sources */,
 				58FFD9592EF2900D00C0A7DB /* TimelineView.swift in Sources */,
 				58FFD95A2EF2900D00C0A7DB /* MainTabView.swift in Sources */,
+				5893A3D02F0279BD001F310F /* Reaction.swift in Sources */,
 				58FFD97C2EF3462500C0A7DB /* MemoryDetailView.swift in Sources */,
+				5893A3E12F032036001F310F /* StressTestView.swift in Sources */,
+				5893A3E22F032036001F310F /* StressTestGenerator.swift in Sources */,
 				58FFD9AF2EFCD9F200C0A7DB /* CBORDecoder.swift in Sources */,
+				5893A3D82F027CD6001F310F /* MoveMemoryView.swift in Sources */,
 				58FFD95B2EF2900D00C0A7DB /* Colors.swift in Sources */,
 				5893A3C32F01CE97001F310F /* MemoryListCard.swift in Sources */,
 				5893A3AC2EFF49F3001F310F /* ShelfView.swift in Sources */,
+				5893A3DB2F028197001F310F /* OnboardingView.swift in Sources */,
 				5893A3BF2F01C9D9001F310F /* Toast.swift in Sources */,
 				5893A3AD2EFF49F3001F310F /* ShelfJarCard.swift in Sources */,
 				58FFD95C2EF2900D00C0A7DB /* Spacing.swift in Sources */,
 				58FFD99C2EF71C2900C0A7DB /* MemberDetailView.swift in Sources */,
-				58FFD99D2EF71C2900C0A7DB /* CircleView.swift in Sources */,
 				58FFD99E2EF71C2900C0A7DB /* AddMemberView.swift in Sources */,
 				58FFD95D2EF2900D00C0A7DB /* Typography.swift in Sources */,
 				58FFD9822EF3470A00C0A7DB /* ImageCarousel.swift in Sources */,
@@ -820,7 +876,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.getbuds.buds;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -862,7 +918,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.getbuds.buds;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

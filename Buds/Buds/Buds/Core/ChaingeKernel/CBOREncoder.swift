@@ -18,6 +18,16 @@ struct CanonicalCBOREncoder {
         return try ReceiptCanonicalizer.encodeSessionPayload(payload)
     }
 
+    /// Encode ReactionAddedPayload to canonical CBOR (Phase 10.1 Module 1.5)
+    static func encode(_ payload: ReactionAddedPayload) throws -> Data {
+        return try ReceiptCanonicalizer.encodeReactionAddedPayload(payload)
+    }
+
+    /// Encode ReactionRemovedPayload to canonical CBOR (Phase 10.1 Module 1.5)
+    static func encode(_ payload: ReactionRemovedPayload) throws -> Data {
+        return try ReceiptCanonicalizer.encodeReactionRemovedPayload(payload)
+    }
+
     /// Compute CID from canonical CBOR data
     /// CIDv1: multibase(base32) + multicodec(dag-cbor) + multihash(sha2-256)
     static func computeCID(from data: Data) -> String {
@@ -98,6 +108,48 @@ extension UnsignedReceiptPreimage {
         rootCID: String,
         receiptType: String,
         payload: SessionPayload
+    ) throws -> UnsignedReceiptPreimage {
+        let payloadData = try CanonicalCBOREncoder.encode(payload)
+
+        return UnsignedReceiptPreimage(
+            did: did,
+            deviceId: deviceId,
+            parentCID: parentCID,
+            rootCID: rootCID,
+            receiptType: receiptType,
+            payload: payloadData
+        )
+    }
+
+    /// Build unsigned preimage for ReactionAdded receipts (Phase 10.1 Module 1.5)
+    static func buildReactionAddedReceipt(
+        did: String,
+        deviceId: String,
+        parentCID: String?,
+        rootCID: String,
+        receiptType: String,
+        payload: ReactionAddedPayload
+    ) throws -> UnsignedReceiptPreimage {
+        let payloadData = try CanonicalCBOREncoder.encode(payload)
+
+        return UnsignedReceiptPreimage(
+            did: did,
+            deviceId: deviceId,
+            parentCID: parentCID,
+            rootCID: rootCID,
+            receiptType: receiptType,
+            payload: payloadData
+        )
+    }
+
+    /// Build unsigned preimage for ReactionRemoved receipts (Phase 10.1 Module 1.5)
+    static func buildReactionRemovedReceipt(
+        did: String,
+        deviceId: String,
+        parentCID: String?,
+        rootCID: String,
+        receiptType: String,
+        payload: ReactionRemovedPayload
     ) throws -> UnsignedReceiptPreimage {
         let payloadData = try CanonicalCBOREncoder.encode(payload)
 

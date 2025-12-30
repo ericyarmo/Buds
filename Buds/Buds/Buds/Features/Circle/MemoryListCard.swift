@@ -3,6 +3,7 @@
 //  Buds
 //
 //  Phase 10 Step 2.3: Lightweight memory list card component
+//  Phase 10.1 Module 1.0: Visual enrichment signals
 //
 
 import SwiftUI
@@ -18,23 +19,14 @@ struct MemoryListCard: View {
         return formatter
     }()
 
+    private var enrichmentLevel: EnrichmentLevel {
+        item.enrichmentLevel
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            // Thumbnail (cached)
-            if let thumbnailCID = item.thumbnailCID {
-                CachedAsyncImage(cid: thumbnailCID)
-                    .frame(width: 60, height: 60)
-                    .cornerRadius(8)
-            } else {
-                Rectangle()
-                    .fill(Color.budsPrimary.opacity(0.2))
-                    .frame(width: 60, height: 60)
-                    .cornerRadius(8)
-                    .overlay(
-                        Image(systemName: "leaf.fill")
-                            .foregroundColor(.budsPrimary.opacity(0.5))
-                    )
-            }
+            // Thumbnail or enrichment icon
+            thumbnailView
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.strainName)
@@ -42,17 +34,21 @@ struct MemoryListCard: View {
                     .foregroundColor(.budsText)
                     .lineLimit(1)
 
-                HStack(spacing: 2) {
-                    ForEach(0..<item.rating, id: \.self) { _ in
-                        Image(systemName: "star.fill")
-                            .font(.caption)
-                            .foregroundColor(.budsPrimary)
-                    }
-                }
+                // Rating (or "Not rated yet" hint)
+                ratingView
 
+                // Timestamp
                 Text(relativeDateFormatter.localizedString(for: item.createdAt, relativeTo: Date()))
                     .font(.budsCaption)
                     .foregroundColor(.budsTextSecondary)
+
+                // Enrichment hint for minimal buds
+                if enrichmentLevel == .minimal {
+                    Text("+ Add Details")
+                        .font(.budsCaption)
+                        .foregroundColor(.orange)
+                        .padding(.top, 2)
+                }
             }
 
             Spacer()
@@ -63,9 +59,88 @@ struct MemoryListCard: View {
         }
         .padding()
         .background(Color.budsCard)
+        .overlay(cardBorder)  // Phase 10.1: Dashed border for minimal buds
         .cornerRadius(12)
         .onTapGesture {
             Task { await onTap() }
+        }
+    }
+
+    // MARK: - Subviews
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        if let thumbnailCID = item.thumbnailCID {
+            CachedAsyncImage(cid: thumbnailCID)
+                .frame(width: 60, height: 60)
+                .cornerRadius(8)
+        } else {
+            // Different icon based on enrichment level
+            Rectangle()
+                .fill(iconBackgroundColor)
+                .frame(width: 60, height: 60)
+                .cornerRadius(8)
+                .overlay(
+                    Image(systemName: iconName)
+                        .foregroundColor(iconColor)
+                        .font(.title2)
+                )
+        }
+    }
+
+    @ViewBuilder
+    private var ratingView: some View {
+        if item.rating > 0 {
+            HStack(spacing: 2) {
+                ForEach(0..<item.rating, id: \.self) { _ in
+                    Image(systemName: "star.fill")
+                        .font(.caption)
+                        .foregroundColor(.budsPrimary)
+                }
+            }
+        } else {
+            Text("⭐️ Not rated yet")
+                .font(.budsCaption)
+                .foregroundColor(.budsTextSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private var cardBorder: some View {
+        if enrichmentLevel == .minimal {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    Color.orange.opacity(0.5),
+                    style: StrokeStyle(lineWidth: 2, dash: [5, 5])
+                )
+        } else {
+            EmptyView()
+        }
+    }
+
+    // MARK: - Enrichment Visual Properties
+
+    private var iconName: String {
+        switch enrichmentLevel {
+        case .minimal: return "pencil.circle"
+        case .partial: return "leaf.circle"
+        case .complete: return "leaf.fill"
+        }
+    }
+
+    private var iconColor: Color {
+        switch enrichmentLevel {
+        case .minimal: return .orange
+        case .partial: return .yellow
+        case .complete: return .budsPrimary
+        }
+    }
+
+    private var iconBackgroundColor: Color {
+        switch enrichmentLevel {
+        case .minimal: return .orange.opacity(0.2)
+        case .partial: return .yellow.opacity(0.2)
+        case .complete: return .budsPrimary.opacity(0.2)
         }
     }
 }
@@ -159,7 +234,9 @@ struct CachedAsyncImage: View {
             rating: 4,
             createdAt: Date(),
             thumbnailCID: nil,
-            jarID: "solo"
+            jarID: "solo",
+            effects: ["relaxed", "happy"],
+            notes: "Great evening strain"
         ),
         onTap: {}
     )

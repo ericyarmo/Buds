@@ -1,7 +1,7 @@
 # Buds Privacy Architecture
 
-**Last Updated:** December 20, 2025
-**Version:** v0.1 (Phase 5: Circle Privacy Model Complete)
+**Last Updated:** December 30, 2025
+**Version:** v0.1 (Phase 10.1: Jars & Reactions Complete)
 **Principle:** Privacy by Default, Consent Before Collection
 
 ---

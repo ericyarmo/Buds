@@ -58,17 +58,21 @@ struct TimelineView: View {
                     await jarManager.loadJars()  // Phase 9b: Reload stats
                 }
             }) {
-                CreateMemoryView(jarID: selectedJarID)
+                NavigationStack {
+                    CreateMemoryView(jarID: selectedJarID)
+                }
             }
             .sheet(item: $viewModel.selectedMemory) { memory in
-                MemoryDetailView(memory: memory)
-                    .onDisappear {
-                        // Reload memories and jar stats when detail view is dismissed
-                        Task {
-                            await viewModel.loadMemories(jarID: selectedJarID)
-                            await jarManager.loadJars()  // Phase 9b: Reload stats (in case of delete)
+                NavigationStack {
+                    MemoryDetailView(memory: memory)
+                        .onDisappear {
+                            // Reload memories and jar stats when detail view is dismissed
+                            Task {
+                                await viewModel.loadMemories(jarID: selectedJarID)
+                                await jarManager.loadJars()  // Phase 9b: Reload stats (in case of delete)
+                            }
                         }
-                    }
+                }
             }
             .task {
                 await viewModel.loadMemories(jarID: selectedJarID)

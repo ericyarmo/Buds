@@ -1,158 +1,189 @@
-# Buds v0.1 🌿
+# Buds v1.0 🌿
 
-**Private cannabis memory sharing for you and up to 12 close friends**
+**Private cannabis memory journal with E2EE sharing for up to 12 friends**
 
-Built on ChaingeOS principles: receipts-first, local-first, privacy by default.
+Built on receipt-first, local-first, privacy-by-default principles.
 
 ---
 
 ## Project Status
 
-🚀 **LIVE ON TESTFLIGHT** - Phase 7 Complete (December 25, 2025)
-
-**Current Build:** v1.0 (Build 1) - Approved for external testing (10k users)
+**Current Build:** ✅ Phases 1-10 Complete | 🚧 Phase 10.1 In Progress (Beta Readiness)
+**Date:** December 29, 2025
+**Version:** 1.0.0 (Beta)
 **Bundle ID:** `app.getbuds.buds`
-**Latest:** E2EE with Signature Verification + R2 Storage ✅
-**Next Up:** Phase 8 - Map View + Fuzzy Location Privacy
+
+**Latest Milestone:** Phase 10.1 Modules 1-5 Complete ✅
+**Next Up:** Module 6 - TestFlight Prep
+**Goal:** TestFlight beta with 20-50 real users → Gather feedback → App Store
 
 ---
 
-## Quick Start
+## Quick Start (Coding Agents)
 
-### 1. Read the Docs (Recommended Order)
+### Essential Reading (In Order)
 
-All architecture documentation is in [`/docs/`](./docs/). **Read in this order:**
+1. **[`R1_MASTER_PLAN_UPDATED.md`](./docs/planning/R1_MASTER_PLAN_UPDATED.md)** ← **START HERE**
+   - Complete project status (what's built, what's next)
+   - All architecture patterns for agents
+   - Phase-by-phase implementation history
+   - Current file structure with status
 
-#### **Phase 1: Understanding the System (Critical - Read First)**
+2. **[`PHASE_10.1_BETA_READINESS.md`](./docs/planning/PHASE_10.1_BETA_READINESS.md)**
+   - Current work in progress
+   - Module 1.0 complete (simplified create flow)
+   - Modules 1.1-1.4 specs (detail view, edit, delete, reactions)
 
-1. **[`ARCHITECTURE.md`](./docs/ARCHITECTURE.md)** - System overview, principles, layers
-   - Start here for the big picture
-   - Understand causality-first architecture (parentCID = truth, time = claim)
+3. **[`CANONICALIZATION_SPEC.md`](./docs/CANONICALIZATION_SPEC.md)** ← **CRITICAL**
+   - Receipt signing implementation
+   - Unsigned preimage pattern
+   - CBOR encoding rules
 
-2. **[`CANONICALIZATION_SPEC.md`](./docs/CANONICALIZATION_SPEC.md)** - Receipt signing (CRITICAL)
-   - **Must read carefully** - Defines exact bytes signed/hashed
-   - Unsigned preimage pattern avoids CID/signature circularity
-   - Strongly-typed payloads with `claimed_time_ms`
+4. **[`DATABASE_SCHEMA.md`](./docs/DATABASE_SCHEMA.md)**
+   - GRDB schema (current migration: v5)
+   - Tables: jars, jar_members, local_receipts, ucr_headers, blobs, reactions
 
-3. **[`DATABASE_SCHEMA.md`](./docs/DATABASE_SCHEMA.md)** - GRDB schema
-   - Skim tables, understand `ucr_headers` vs `local_receipts`
-   - Note: `received_at` for ordering, `claimed_time_ms` in payload
-
-4. **[`RECEIPT_SCHEMAS.md`](./docs/RECEIPT_SCHEMAS.md)** - All receipt types
-   - Reference as needed (don't memorize)
-   - All payloads have `claimed_time_ms` (author's time claim)
-
-#### **Phase 2: Feature Deep Dives (Skim, Read When Implementing)**
-
-5. **[`E2EE_DESIGN.md`](./docs/E2EE_DESIGN.md)** - Circle sharing encryption
-   - X25519 key agreement + AES-GCM
-   - Multi-device key wrapping
-
-6. **[`PRIVACY_ARCHITECTURE.md`](./docs/PRIVACY_ARCHITECTURE.md)** - Location privacy
-   - Fuzzy grid snapping, delayed sharing
-   - OFF by default
-
-7. **[`AGENT_INTEGRATION.md`](./docs/AGENT_INTEGRATION.md)** - Cannabis expert AI
-   - DeepSeek/Qwen integration (20x cheaper than Claude)
-   - Read-only queries with citations
-
-8. **[`UX_FLOWS.md`](./docs/UX_FLOWS.md)** - User flows & wireframes
-   - Reference when building UI
-
-#### **Phase 3: Backend & Business (Backend Developers)**
-
-9. **[`RELAY_SERVER.md`](./docs/RELAY_SERVER.md)** - Cloudflare Workers API
-   - E2EE message relay (server sees only ciphertext)
-   - Device registration, message delivery
-
-10. **[`DISPENSARY_INSIGHTS.md`](./docs/DISPENSARY_INSIGHTS.md)** - B2B product
-    - Deals-based revenue model ($99-599/month tiers)
-    - K-anonymity threshold (n≥75)
-
-#### **Phase 4: Implementation (When Ready to Build)**
-
-11. **[`DEVELOPMENT_ROADMAP.md`](./docs/DEVELOPMENT_ROADMAP.md)** - 4-week build plan
-    - Phase 0: Foundation (2-3 days)
-    - Phase 1: Core Kernel (4-5 days)
-    - Phase 2-7: UI, Location, Circle, Agent, Polish
+5. **[`E2EE_DESIGN.md`](./docs/E2EE_DESIGN.md)**
+   - X25519 key agreement + AES-256-GCM
+   - Multi-device encryption
+   - Verified in Phase 10 (signatures still valid after jar deletion)
 
 ---
 
-**tl;dr - Absolute minimum:**
-- Read: `ARCHITECTURE.md` (30 min)
-- Read carefully: `CANONICALIZATION_SPEC.md` (30 min)
-- Skim: `DATABASE_SCHEMA.md` (15 min)
-- Reference others as needed
+## Current Architecture (Dec 28, 2025)
 
-### 2. Set Up Project
+### Receipt-Based Data Model (IMMUTABLE)
 
-```bash
-# Clone repo (after creating on GitHub)
-git clone <repo_url>
-cd Buds
+Every event is a signed, content-addressed receipt:
 
-# Open in Xcode (create project first)
-open Buds.xcodeproj
-```
-
-### 3. Install Dependencies
-
-**Swift Package Manager (SPM):**
-- GRDB: `https://github.com/groue/GRDB.swift`
-- Firebase: `https://github.com/firebase/firebase-ios-sdk`
-
-**External Services:**
-- Firebase project (phone auth + push)
-- Cloudflare Workers account (relay server)
-- LLM API key (Agent: DeepSeek/Qwen/Claude - see AGENT_INTEGRATION.md)
-
-### 4. Follow the Roadmap
-
-See [`DEVELOPMENT_ROADMAP.md`](./docs/DEVELOPMENT_ROADMAP.md) for detailed phase breakdown.
-
-**Quick overview:**
-- **Week 1:** Foundation + Core Kernel
-- **Week 2:** UI + Location + Map
-- **Week 3-4:** Circle + E2EE + Agent
-- **Week 4:** Polish + TestFlight
-
----
-
-## Architecture Highlights
-
-### Causality-First Receipt Architecture
-Every event is a signed, content-addressed receipt (UCRHeader):
 ```swift
 struct UCRHeader {
-    let cid: String                    // CIDv1 (dag-cbor, sha2-256)
-    let did: String                    // Author DID
-    let parentCID: String?             // Edit chain parent (CAUSAL TRUTH)
-    let rootCID: String                // First version in chain
-    let receiptType: String            // app.buds.session.created/v1
-    let payload: ReceiptPayload        // Strongly-typed (contains claimed_time_ms)
-    let signature: String              // Ed25519 (base64)
-    // NO timestamp! Time is in payload as claimed_time_ms (author's claim, not truth)
+    let cid: String              // CIDv1 (dag-cbor, sha2-256)
+    let did: String              // Author DID
+    let parentCID: String?       // Edit chain parent (CAUSAL TRUTH)
+    let rootCID: String          // First version in chain
+    let receiptType: String      // app.buds.session.created/v1
+    let payload: ReceiptPayload  // Strongly-typed (contains claimed_time_ms)
+    let signature: String        // Ed25519 (base64)
 }
 ```
 
-**Key principle:** Causality (parentCID chains) = verifiable truth. Time (claimed_time_ms) = unverifiable claim.
+**Key Principle:** Causality (parentCID) = truth. Time (claimed_time_ms) = claim.
 
-### Local-First Storage
-- **GRDB (SQLite)** for local persistence
-- **Optimistic updates** (UI updates immediately, sync background)
-- **Offline-first** (full functionality without network)
+**CRUD Pattern:**
+```swift
+// Create
+let receipt = try await receiptManager.create(payload: payload)
 
-### E2EE Circle Sharing
-- **X25519 key agreement** for key wrapping
-- **AES-256-GCM** for payload encryption
-- **Device-based keys** (multi-device support)
-- **Max 12 members** (manageable key distribution)
+// Read
+let memory = try await memoryRepository.fetch(id: uuid)
 
-### Privacy by Default
-- **Location OFF** by default
-- **Fuzzy locations** for Circle sharing (~500m grid)
-- **Explicit consent** for every share
-- **E2EE relay** (server sees only ciphertext)
+// Update (creates NEW receipt with same UUID)
+let updated = try await receiptManager.update(uuid: uuid, newPayload: newPayload)
+
+// Delete (soft delete, receipt remains)
+try await receiptManager.delete(uuid: uuid)
+```
+
+**Why Immutable:** Enables E2EE verification, conflict-free sync, audit trails.
+
+---
+
+### Jar-Centric Model
+
+**Schema:**
+```
+User has N Jars
+Jar has N Members (max 12)
+Jar has N Buds (unlimited)
+Bud belongs to exactly 1 Jar
+```
+
+**Critical Rule:** One bud = one jar. No multi-jar buds.
+
+**Jar Types:**
+1. **Solo**: Auto-created, single-user, cannot delete
+2. **Shared**: Multi-user (2-12), can delete (buds move to Solo)
+
+---
+
+### Lightweight List Loading (Performance)
+
+**Problem:** Loading full Memory objects in lists = 70-80MB.
+
+**Solution:** MemoryListItem model (metadata only):
+
+```swift
+struct MemoryListItem {
+    let id: UUID
+    let strainName: String
+    let productType: ProductType
+    let rating: Int
+    let createdAt: Date
+    let thumbnailCID: String?    // CID only, not image data
+    let jarID: String
+    let effects: [String]        // For enrichment calculation
+    let notes: String?           // For enrichment calculation
+}
+```
+
+**Pattern:**
+```swift
+// List view: Lightweight
+let items = try await repository.fetchLightweightList(jarID: jarID, limit: 50)
+
+// Detail view: Full Memory (when needed)
+let memory = try await repository.fetch(id: memoryID)
+```
+
+**Result:** Memory <40MB, smooth 60fps scrolling.
+
+---
+
+### Simplified Create Flow (Progressive Disclosure)
+
+**Problem:** Long forms intimidate users, cause abandonment.
+
+**Solution:** Create fast → Enrich later.
+
+**Pattern:**
+```swift
+// Step 1: Create with minimal data (name + type)
+CreateMemoryView(jarID: jarID) { createdMemoryID in
+    // Step 2: Immediately show enrich view
+    self.memoryToEnrich = createdMemoryID
+}
+
+// Step 3: User can enrich OR skip
+EditMemoryView(memoryID: memoryID, isEnrichMode: true)
+```
+
+**Visual Enrichment Signals:**
+```swift
+enum EnrichmentLevel {
+    case minimal   // Just name, maybe type (dashed orange border)
+    case partial   // Some details added (solid border)
+    case complete  // Fully enriched (thumbnail image)
+}
+
+extension MemoryListItem {
+    var enrichmentLevel: EnrichmentLevel {
+        var score = 0
+        if rating > 0 { score += 1 }
+        if !effects.isEmpty { score += 1 }
+        if notes != nil && !notes!.isEmpty { score += 1 }
+        if thumbnailCID != nil { score += 1 }
+
+        switch score {
+        case 0...1: return .minimal
+        case 2...3: return .partial
+        default: return .complete
+        }
+    }
+}
+```
+
+**Why This Works:** Lower barrier to entry, momentum-based enrichment, visual feedback.
 
 ---
 
@@ -161,279 +192,322 @@ struct UCRHeader {
 | Component | Technology | Why |
 |-----------|-----------|-----|
 | Language | Swift 6 | Latest features, concurrency |
-| UI | SwiftUI | Declarative, native |
+| UI | SwiftUI | Declarative, native performance |
 | Database | GRDB | Production SQLite wrapper |
-| Crypto | CryptoKit | Apple's native (Ed25519, X25519, AES) |
+| Crypto | CryptoKit | Apple native (Ed25519, X25519, AES) |
 | Auth | Firebase Auth | Phone verification |
 | Backend | Cloudflare Workers | Edge compute, E2EE relay |
-| Agent | Pluggable LLM | DeepSeek/Qwen recommended (20x cheaper than Claude) |
+| Storage | Cloudflare R2 | Object storage for encrypted payloads |
 
 ---
 
-## Project Structure
+## File Structure (Dec 28, 2025)
 
 ```
 Buds/
-├── docs/                   # Architecture documentation (YOU ARE HERE)
-├── Buds/                   # iOS app (create in Xcode)
-│   ├── App/
-│   ├── Core/
-│   │   ├── ChaingeKernel/
-│   │   ├── Database/
-│   │   └── Models/
-│   ├── Features/
-│   │   ├── Timeline/
-│   │   ├── Map/
-│   │   ├── Circle/
-│   │   └── Agent/
-│   └── Shared/
-└── worker/                 # Cloudflare Workers (relay server)
+├── Core/
+│   ├── Auth/
+│   │   ├── AuthManager.swift           ✅ Phase 1
+│   │   └── DeviceManager.swift         ✅ Phase 1
+│   ├── Crypto/
+│   │   ├── CryptoManager.swift         ✅ Phase 2
+│   │   └── KeychainManager.swift       ✅ Phase 2
+│   ├── Receipt/
+│   │   ├── ReceiptManager.swift        ✅ Phase 3
+│   │   └── SignatureVerifier.swift     ✅ Phase 3
+│   ├── Database/
+│   │   ├── Database.swift              ✅ Phase 7 (migration v5 current)
+│   │   └── Repositories/
+│   │       ├── MemoryRepository.swift  ✅ Phase 7, 🔄 Phase 10.1
+│   │       ├── JarRepository.swift     ✅ Phase 8
+│   │       └── ReactionRepository.swift 🔜 Phase 10.1 Module 1.4
+│   ├── Models/
+│   │   ├── Memory.swift                ✅ Phase 7
+│   │   ├── MemoryListItem.swift        ✅ Phase 10, 🔄 Phase 10.1
+│   │   ├── Jar.swift                   ✅ Phase 8
+│   │   ├── JarMember.swift             ✅ Phase 8
+│   │   └── Reaction.swift              🔜 Phase 10.1 Module 1.4
+│   ├── Relay/
+│   │   └── RelayClient.swift           ✅ Phase 4
+│   └── JarManager.swift                ✅ Phase 8, 🔄 Phase 10
+├── Features/
+│   ├── Auth/
+│   │   └── LoginView.swift             ✅ Phase 1
+│   ├── Shelf/
+│   │   ├── ShelfView.swift             ✅ Phase 9b, 🔄 Phase 10.1
+│   │   └── JarCard.swift               ✅ Phase 9b
+│   ├── Circle/
+│   │   ├── JarDetailView.swift         ✅ Phase 9a, 🔄 Phase 10.1
+│   │   ├── AddMemberView.swift         ✅ Phase 9a
+│   │   ├── MemberDetailView.swift      ✅ Phase 9a
+│   │   └── MemoryListCard.swift        ✅ Phase 10, 🔄 Phase 10.1
+│   ├── CreateMemory/
+│   │   ├── CreateMemoryView.swift      ✅ Phase 6, 🔄 Phase 10.1 (simplified)
+│   │   ├── JarPickerView.swift         ✅ Phase 10, 🔄 Phase 10.1
+│   │   ├── PhotoPicker.swift           ✅ Phase 6
+│   │   └── ImagePicker.swift           ✅ Phase 6
+│   ├── Memory/
+│   │   ├── EditMemoryView.swift        🔜 Phase 10.1 Module 1.2
+│   │   ├── ReactionPicker.swift        🔜 Phase 10.1 Module 1.4
+│   │   └── ReactionSummary.swift       🔜 Phase 10.1 Module 1.4
+│   └── Timeline/
+│       └── MemoryDetailView.swift      ✅ Phase 10.1 Module 1.1 (active)
+├── Shared/
+│   ├── DesignSystem/
+│   │   ├── BudsColors.swift            ✅ Phase 6
+│   │   ├── BudsTypography.swift        ✅ Phase 6
+│   │   └── BudsSpacing.swift           ✅ Phase 6
+│   └── Toast.swift                     ✅ Phase 10
+└── ContentView.swift                   ✅ Phase 1, 🔄 Phase 10
+
+Legend:
+✅ Complete and stable
+🔄 Modified in current phase
+🔜 Planned, not yet built
+❌ Deprecated, not used
 ```
 
 ---
 
-## Key Architectural Fixes
+## What's Working (Phases 1-10 Complete)
 
-✅ **Causality-first** - parentCID chains = truth, time = claim (in payload as claimed_time_ms)
-✅ **CID/signature circularity** - Unsigned preimage pattern avoids circular dependency
-✅ **Deterministic CBOR** - Strongly-typed payloads, sorted keys, Int64 timestamps
-✅ **Device vs DID** - Multi-device model with per-device key wrapping
-✅ **Append-only** - Edits create new receipts, deletions create tombstones (no mutations)
+### ✅ Core Infrastructure
+- E2EE encryption (X25519 + AES-256-GCM)
+- Receipt-based data model (immutable, verifiable)
+- GRDB database (migration v5)
+- Blob storage for images
+- Multi-device sync
+- Cloudflare relay (E2EE message relay)
+
+### ✅ Features
+- Phone auth (Firebase)
+- Create bud flow (simplified: name + type)
+- Jar system (Solo + Shared, max 12 members)
+- Jar CRUD (create, delete, view)
+- Member management (add, remove, roles)
+- Shelf grid view (home)
+- Memory list cards (lightweight, <40MB)
+- Pull-to-refresh
+- Toast notifications
+- Haptic feedback
+
+### ✅ Design System
+- BudsColors, BudsTypography, BudsSpacing
+- Dark mode throughout
+- Consistent UI components
 
 ---
 
-## Contributing
+## What's In Progress (Phase 10.1)
 
-This is a private project (for now). Architecture by Claude (Anthropic) + Eric. Vaksman will be coming soon...
+### ✅ Module 1.0: Simplified Create Flow (COMPLETE)
+- Reduced create form to 2 fields (name + type)
+- Auto-shows enrich view after save
+- Visual enrichment signals (dashed orange borders for minimal buds)
+- Pencil icon for unenriched buds
+- "+ Add Details" hint text
+
+### ✅ Module 1.1: Memory Detail View (COMPLETE)
+- Full-screen bud detail with black background
+- Image carousel (swipeable)
+- All metadata display (strain, type, rating, notes, effects, product details)
+- Edit button wired to EditMemoryView
+- Delete button with confirmation
+- Navigation from MemoryListCard tap
+
+### ✅ Module 1.2: Edit Memory (Enrich) (COMPLETE)
+- Full edit form (rating, effects, notes, images)
+- 12 common effects checkboxes
+- Camera + photo library options
+- Pre-fills existing data
+- Updates receipt (immutable pattern)
+- Toast on save success
+- Proper layout (20px horizontal padding)
+
+### ✅ Module 1.3: Delete Memory (COMPLETE)
+- Delete button in detail view with confirmation
+- Cleans up blobs (images) and database entries
+- Toast notification on delete
+- List refreshes after delete
+- Note: Swipe-to-delete skipped (conflicts with nav gesture)
+
+### ✅ Module 1.4: Reactions System (COMPLETE)
+- 5 emoji reactions: ❤️ 😂 🔥 👀 😌
+- Tap to toggle (add/remove/change)
+- Summary view with counts (e.g., "❤️ 3  🔥 2")
+- Database table with migration (v6)
+- ReactionRepository for CRUD
+- Cascade delete with memories
+- UI components: ReactionPicker + ReactionSummaryView
+- Note: Local-only, uses placeholder phone (multi-user sync deferred)
+
+### 🔜 Module 1.5: Multi-User Reactions Sync (DEFERRED)
+- Receipt-based reactions for E2EE shared jars
+- Get real user phone from AuthManager
+- Sync via relay (same pattern as memories)
+- Display combined reactions from all jar members
+- Deferred: Can ship beta without this, add after feedback
+
+### ✅ Module 2: Jar System Polish (COMPLETE)
+- Custom mason jar icon with lid + leaf inside
+- Edit jar (context menu → Edit → change name/description)
+- Delete confirmation already shows bud count (✅ was already done!)
+- Move bud between jars (Move button → select jar → toast)
+- Toast notifications for create/edit/delete/move operations
+
+### ✅ Module 3: User Guidance (COMPLETE)
+- **3.1 Onboarding**: 3-screen first-launch flow (Welcome, Jars, Privacy)
+- **3.2 Profile/Settings**: Account info, privacy links, dev tools, E2EE test
+- **3.3 Empty States**: Consistent empty states across Shelf, Jar detail, Members
+- Tab bar simplified to 2 tabs (Shelf + Profile)
+- ProfileView enhanced with Privacy Policy and Terms links
+
+### ✅ Module 4: Error Handling & Feedback (COMPLETE)
+- **4.1 Error Toasts**: Tap-to-dismiss, 5s duration, 90% opacity red backgrounds
+- **4.2 Loading States**: All views show "Loading..." with .budsPrimary spinner
+- **4.3 Confirmation Dialogs**: All destructive actions confirmed (delete jar/bud/member, reset data)
+- Toast system enhanced with auto-durations (5s errors, 2s success)
+
+### ✅ Module 5: Performance & Testing (COMPLETE)
+- **5.1 Stress Testing**: Tool to generate 100+ test buds, performance monitoring
+- **5.2 Fresh Install**: 10-step checklist for first-time user experience
+- **5.3 Multi-Device**: Testing across iPhone SE, 15, Pro Max
+- Stress test generator accessible from Profile → Debug section
 
 ---
 
-## Security
+## Phase History (Summary)
 
-**Threat model:** See [`PRIVACY_ARCHITECTURE.md`](./docs/PRIVACY_ARCHITECTURE.md)
+| Phase | Status | What Was Built |
+|-------|--------|----------------|
+| **1-7** | ✅ Complete | Foundation (Auth, E2EE, Receipts, DB, Images, Relay, Signatures) |
+| **8** | ✅ Complete | Jar Model (migrated from Circle, added jars + jar_members tables) |
+| **9a** | ✅ Complete | Jar Management (CRUD, member management, roles) |
+| **9b** | ✅ Complete | Shelf View (grid layout, replaced Timeline) |
+| **10** | ✅ Complete | Production Hardening (E2EE verified, memory optimized, toast, haptics) |
+| **10.1** | 🚧 In Progress | Beta Readiness (simplified UX, reactions, polish) - **Modules 1-5 done** |
+| **11-14** | 🔜 Planned | Map, Shop, AI, App Store Prep (deferred until after beta feedback) |
 
-**Key principles:**
-- E2EE for Circle sharing
+**See [`R1_MASTER_PLAN_UPDATED.md`](./docs/planning/R1_MASTER_PLAN_UPDATED.md) for complete phase details.**
+
+---
+
+## Development Setup
+
+### 1. Clone & Open
+
+```bash
+git clone <repo_url>
+cd Buds
+open Buds.xcodeproj
+```
+
+### 2. Install Dependencies (SPM)
+
+- **GRDB**: `https://github.com/groue/GRDB.swift`
+- **Firebase**: `https://github.com/firebase/firebase-ios-sdk`
+
+### 3. Configure Services
+
+- Firebase project (phone auth + push)
+- Cloudflare Workers account (relay server)
+- See [`buds-relay/README.md`](../buds-relay/README.md) for relay setup
+
+### 4. Build & Run
+
+```bash
+# Clean build
+Cmd+Shift+K
+
+# Build
+Cmd+B
+
+# Run on simulator
+Cmd+R
+```
+
+---
+
+## Testing
+
+### Current Test Focus (Phase 10.1 Module 1.0)
+
+1. **Simplified Create Flow**
+   - Tap FAB → Select jar → Enter name → Continue → Enrich view appears
+   - Skip enrichment → Toast appears → Bud created
+
+2. **Visual Enrichment Signals**
+   - Minimal buds show dashed orange border
+   - Pencil icon instead of thumbnail
+   - "+ Add Details" hint text
+
+3. **Performance**
+   - Memory <40MB with 10+ buds
+   - Smooth 60fps scrolling in jar lists
+
+**See test plan in [`PHASE_10.1_BETA_READINESS.md`](./docs/planning/PHASE_10.1_BETA_READINESS.md)**
+
+---
+
+## Security & Privacy
+
+**Threat Model:** See [`PRIVACY_ARCHITECTURE.md`](./docs/PRIVACY_ARCHITECTURE.md)
+
+**Key Principles:**
+- E2EE for jar sharing (server sees only ciphertext)
 - Local-first (data never leaves device unless shared)
-- Relay server is untrusted (sees only ciphertext)
-- **No PII in receipts**: Phone numbers live only in Firebase Auth layer; receipts never include phone/email/name. Circle uses local nicknames (displayName) stored only on your device. DIDs are derived from cryptographic keys, not personal identifiers.
+- Location OFF by default
+- No PII in receipts (DIDs are cryptographic, not personal)
+- Multi-device support with per-device key wrapping
+
+**E2EE Verification:** ✅ Tested in Phase 10 - Signatures remain valid after jar deletion.
 
 ---
 
 ## Legal
 
-**Age:** 21+ only (federally illegal in US)
-**Disclaimer:** No medical advice, no sales facilitation
-**Privacy:** Designed for GDPR/CCPA compliance; export/delete/portability planned in v0.2+
+- **Age:** 21+ only (federally illegal in US)
+- **Disclaimer:** No medical advice, no sales facilitation
+- **Privacy:** GDPR/CCPA-compliant design
 
 ---
 
-## Build Progress
+## Roadmap
 
-### Phase 0: Foundation ✅
-- ✅ Architecture documentation complete (11 docs)
-- ✅ Project structure created
-- ✅ Core files wired (18 production files)
-- ✅ `.gitignore` + build guides configured
+**Current Milestone:** TestFlight beta with 20-50 real users (2 weeks)
 
-### Phase 1: Core Kernel ✅ (Physics-Tested)
-- ✅ **IdentityManager** - Ed25519/X25519 keypairs + DID generation + Keychain storage
-- ✅ **CBOREncoder** - **Physics-tested canonical CBOR (0.11ms p50)** from BudsKernelGolden
-- ✅ **CBORCanonical** - RFC 8949 compliant encoder with lexicographic key sorting
-- ✅ **ReceiptCanonicalizer** - Struct-to-CBOR converter for deterministic encoding
-- ✅ **ReceiptManager** - Create/sign receipts with unsigned preimage pattern
-- ✅ **Database** - GRDB with all 7 tables + migrations
-- ✅ **Models** - UCRHeader, SessionPayload, Memory (user-facing)
-- ✅ **MemoryRepository** - GRDB queries (fetch/create/update/delete)
+**Next Steps:**
+1. ✅ Module 1.0: Simplified Create (DONE)
+2. 🔜 Module 1.1: Memory Detail View
+3. 🔜 Module 1.2: Edit Memory (Enrich)
+4. 🔜 Module 1.3: Delete Memory
+5. 🔜 Module 1.4: Reactions System
+6. 🔜 Modules 2-6: Polish + TestFlight upload
 
-### Phase 2: UI Foundation ✅
-- ✅ **Design System** - Colors, Typography, Spacing (16 colors, 5 fonts)
-- ✅ **MainTabView** - Tab navigation (Timeline, Map, Circle, Profile)
-- ✅ **TimelineView** - Empty state + memory list with pull-to-refresh
-- ✅ **CreateMemoryView** - Full form (strain, rating, effects, notes, details)
-- ✅ **MemoryCard** - Production-ready card component with all fields
-- ✅ **EffectTag** - Color-coded effect chips
+**Post-Beta:**
+- Phase 11: Map View
+- Phase 12: Shop View
+- Phase 13: AI Buds
+- Phase 14: App Store Launch
 
-### Phase 3: Image Support + Memory Enhancement ✅
-- ✅ **Multi-Image Support** - Up to 3 photos per memory (camera + library)
-- ✅ **Photo Picker** - Camera flip, multi-select, compression (2MB max)
-- ✅ **Image Carousel** - Swipeable with page indicators
-- ✅ **Photo Management** - Reorder, delete, visual feedback
-- ✅ **Memory Detail View** - Hero images, card layout, better hierarchy
-- ✅ **Timeline Enhancement** - Image previews, gradient headers
-- ✅ **Database Migration v2** - image_cid → image_cids (JSON array)
-- ✅ **Blob Storage** - CID-based image retrieval
+**Goal:** Ship beta → Gather feedback → Iterate → App Store.
 
-**See [PHASE_3_COMPLETE.md](./PHASE_3_COMPLETE.md)** for full Phase 3 details.
+---
 
-### Current Status: 🚀 **LIVE ON TESTFLIGHT** (Dec 26, 2025)
+## Contributing
 
-**Latest**: Phase 8 Complete - Jar Architecture Migration ✅
+Private project. Architecture by Claude (Anthropic) + Eric.
 
-**What's working:**
-- ✅ Database: jars + jar_members tables, jar_id scoping on all buds
-- ✅ Backend: JarRepository + JarManager fully functional
-- ✅ Models: Jar, JarMember, Memory (with jarID property)
-- ✅ Migration: Circle members → Solo jar (zero data loss)
-- ✅ E2EE signature verification (Phase 7)
-- ✅ R2 storage migration (Phase 7)
-- ⚠️  Circle UI temporarily stubbed (Phase 9 will rebuild)
+---
 
-**TestFlight:**
-- Build: v1.0 (Build 1)
-- Status: Approved for external testing
-- Testers: Up to 10,000 external testers
-- Bundle ID: `app.getbuds.buds`
+## Build Progress Tracker
 
-### Phase 4: Firebase Auth + Profile ✅ (COMPLETE - Dec 19, 2025)
-- ✅ Firebase Phone Authentication (SMS verification)
-- ✅ APNs integration for silent push
-- ✅ AuthManager with phone verification flow
-- ✅ ProfileView with editable display name
-- ✅ Identity section (DID + Firebase UID)
-- ✅ Storage info + account settings
-- ✅ Sign out / delete account
-- ✅ Privacy-first: phone numbers only in Firebase Auth layer
+**Last Updated:** December 28, 2025
+**Current Phase:** Phase 10.1 (Beta Readiness)
+**Latest Commit:** Module 2 - Jar System Polish ✅
 
-**See [`PHASE_4_COMPLETE.md`](./PHASE_4_COMPLETE.md) for full details.**
+**Next Session:** User Guidance (Module 3)
 
-### Phase 5: Circle Mechanics ✅ (COMPLETE - Dec 20, 2025)
-- ✅ **Database Migration v3** - circles + devices tables
-- ✅ **CircleMember Model** - DID-based identity with status tracking
-- ✅ **Device Model** - Multi-device support schema
-- ✅ **CircleManager** - CRUD operations (add/remove/update members)
-- ✅ **CircleView** - Main Circle screen with empty state + member list
-- ✅ **AddMemberView** - Sheet for inviting friends (display name + phone)
-- ✅ **MemberDetailView** - Member details with inline editing + remove
-- ✅ **12-Member Limit** - Privacy-focused roster size enforced
-- ✅ **Dark Mode UI** - Black backgrounds across Timeline/Circle/Profile
-- ✅ **Placeholder DIDs** - Local-only (Phase 6 adds relay lookup)
+---
 
-**See [`PHASE_5_COMPLETE.md`](./PHASE_5_COMPLETE.md) for full details.**
-
-### Phase 6: E2EE Sharing + Cloudflare Relay ✅ (COMPLETE - Dec 24, 2025)
-
-**⚠️ HIGH COMPLEXITY: E2EE streams for <12 people with offline ownership**
-
-**Focus:** Transform Circle from UI-only to functional E2EE sharing with Cloudflare Workers relay
-
-**Critical Components:**
-- ✅ **Cloudflare Workers** - TypeScript relay API (~440 lines)
-  - Device registration endpoint
-  - Phone → DID lookup (SHA-256 hashed)
-  - Message send/receive with D1 storage
-  - Firebase Auth token verification
-- ✅ **Device Management** - Multi-device registration + discovery
-  - Device ID generation on first launch
-  - X25519 + Ed25519 keypair storage
-  - Register with Cloudflare on sign-in
-- ✅ **E2EE Encryption** - Hybrid encryption primitives
-  - X25519 key agreement (ECDH)
-  - AES-256-GCM payload encryption
-  - Per-message ephemeral AES keys
-  - Multi-device key wrapping
-- ✅ **Share Flow** - Memory sharing UI + logic
-  - "Share to Circle" UI (member selection)
-  - Encrypt raw CBOR receipt
-  - POST to Workers relay
-  - Recipient inbox polling
-- ✅ **Offline Ownership** - Local-first data model
-  - Receipts stored locally (sender copy)
-  - Shared receipts encrypted at rest
-  - Sync conflict resolution strategy
-  - Receipt ownership verification
-
-**Architecture Challenges Solved:**
-- Multi-device E2EE key distribution ✅
-- Offline message queueing ✅
-- Conflict-free replicated data (CRDTs?) ✅
-- Key rotation without breaking shares ✅
-- Device revocation handling ✅
-
-**See [`PHASE_6_PLAN.md`](./PHASE_6_PLAN.md) for implementation guide.**
-
-### Phase 7: E2EE Signature Verification + R2 Migration ✅ (COMPLETE - Dec 25, 2025)
-
-**Focus:** Complete E2EE security with cryptographic verification + scale-ready storage
-
-**Critical Components:**
-- ✅ **CBOR Decoder** - RFC 8949-compliant canonical decoder (171 lines)
-- ✅ **Ed25519 Signature Verification** - Real crypto, replaced placeholder
-- ✅ **CID Integrity Checks** - Prevents relay tampering (verify content matches CID)
-- ✅ **Device-Specific TOFU Key Pinning** - Per-device key verification (prevents key confusion)
-- ✅ **Multi-Device Sync** - Encrypted messages to all user devices
-- ✅ **InboxManager** - 4-step verification (decrypt → verify CID → verify signature → store)
-- ✅ **R2 Storage Migration** - Moved 500KB payloads from D1 to R2 object storage
-
-**Relay Updates:**
-- ✅ Database migration 0003: Added `signature` column
-- ✅ Database migration 0004: Added `r2_key` column for R2 storage
-- ✅ Updated sendMessage: Uploads encrypted payloads to R2 instead of D1
-- ✅ Updated getInbox: Reads from R2, converts to base64 (iOS unchanged!)
-- ✅ Updated cleanup cron: Deletes R2 objects for expired messages
-
-**Security Improvements:**
-- **CID Integrity**: Computed CID must match claimed CID (prevents tampering)
-- **Device-Specific Keys**: Each device has unique Ed25519 keypair (prevents key confusion)
-- **TOFU Key Pinning**: Keys pinned when device first added to Circle
-- **Zero Trust Relay**: Relay only sees ciphertext, cannot read/modify/inject messages
-
-**Scale Improvements:**
-- **Before**: D1 stores 500KB payloads → 50GB/day → Database full in hours ❌
-- **After**: R2 stores payloads → $0.83/month for 30GB → Scales to 100k messages/day ✅
-- **Impact**: 99.97% reduction in D1 storage (1.5TB → 1GB metadata only)
-
-**Test Results:**
-- ✅ iPhone sent encrypted memory to 5 devices
-- ✅ iPhone received encrypted message back from relay
-- ✅ CID Integrity Verified: Content matches claimed CID
-- ✅ Ed25519 Signature Verified: Signature verification PASSED
-- ✅ CBOR Decoded: 242 bytes decoded successfully
-- ✅ Receipt Stored: Shared receipt stored in local database
-
-**See [`PHASE_7_COMPLETE_SUMMARY.md`](./PHASE_7_COMPLETE_SUMMARY.md) for full details.**
-
-### Phase 8: Database Migration + Jar Architecture ✅ (COMPLETE - Dec 26, 2025)
-
-**Goal**: Transform from single Circle (implicit) → multiple Jars (explicit containers)
-
-**What Was Built**:
-- ✅ **Migration v5**: Created jars + jar_members tables
-- ✅ **jar_id Column**: Added to local_receipts (which jar owns this bud)
-- ✅ **sender_did Column**: Added to local_receipts (for received buds)
-- ✅ **Solo Jar Migration**: Migrated existing Circle members → Solo jar
-- ✅ **Jar Model**: Created Jar.swift (id, name, description, ownerDID)
-- ✅ **JarMember Model**: Created JarMember.swift (N:M relationship)
-- ✅ **JarRepository**: CRUD operations for jars and members
-- ✅ **JarManager**: Created (replaces CircleManager)
-- ✅ **MemoryRepository**: Updated with jar filtering (fetchByJar)
-- ⚠️  **Circle UI**: Temporarily stubbed (Phase 9 will rebuild)
-
-**Database Changes**:
-- `jars` table (id, name, description, owner_did, created_at, updated_at)
-- `jar_members` table (jar_id, member_did, display_name, role, status, pubkey_x25519)
-- `local_receipts.jar_id` column (TEXT NOT NULL DEFAULT 'solo')
-- `local_receipts.sender_did` column (TEXT)
-
-**Testing**:
-- ✅ Migration succeeds on existing users (14 members, 7 buds → Solo jar)
-- ✅ Migration succeeds on fresh installs (graceful deferral)
-- ✅ Build succeeds with no errors
-- ✅ Zero data loss
-
-**Files Created**: 4 (+450 lines)
-**Files Modified**: 9
-
-**See [`PHASE_8_COMPLETE.md`](./PHASE_8_COMPLETE.md) for full details.**
-
-### Future Phases
-- [ ] **Phase 9:** Multi-Jar UI + Circle Rebuild (next up - see [`docs/phase9-plan.md`](./docs/phase9-plan.md))
-- [ ] **Phase 10:** Jar Feed View (media-first)
-- [ ] **Phase 11:** Map View + Fuzzy Location Privacy
-- [ ] **Phase 12:** Shop View + Remote Config
-- [ ] **Phase 13:** AI Buds v1 (Reflection-Only)
-- [ ] **Phase 14:** App Store Prep + Polish
-
-**Current file count:** 41 Swift files + 8 docs = Jar architecture complete
-
-**December 26, 2025: Phase 8 complete! Jar architecture migration deployed. Multi-jar backend ready. 🫙✨**
+**For detailed implementation context, always start with [`R1_MASTER_PLAN_UPDATED.md`](./docs/planning/R1_MASTER_PLAN_UPDATED.md)**

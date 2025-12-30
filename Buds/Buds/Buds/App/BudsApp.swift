@@ -138,6 +138,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct BudsApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var authManager = AuthManager.shared
+    @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "onboarding_completed")  // Phase 10.1 Module 3.1
 
     init() {
         print("🔧 [DEBUG] BudsApp init started")
@@ -152,24 +153,32 @@ struct BudsApp: App {
     var body: some Scene {
         WindowGroup {
             if authManager.isAuthenticated {
-                MainTabView()
-                    .task {
-                        // Register device on first authenticated launch
-                        if !DeviceManager.shared.isRegistered {
+                ZStack {
+                    MainTabView()
+                        .task {
+                            // Register device on first authenticated launch
+                            if !DeviceManager.shared.isRegistered {
+                                do {
+                                    try await DeviceManager.shared.registerDevice()
+                                } catch {
+                                    print("❌ Device registration failed: \(error)")
+                                }
+                            }
+
+                            // Ensure Solo jar exists (critical for fresh installs)
                             do {
-                                try await DeviceManager.shared.registerDevice()
+                                try await JarManager.shared.ensureSoloJarExists()
                             } catch {
-                                print("❌ Device registration failed: \(error)")
+                                print("❌ Failed to ensure Solo jar: \(error)")
                             }
                         }
 
-                        // Ensure Solo jar exists (critical for fresh installs)
-                        do {
-                            try await JarManager.shared.ensureSoloJarExists()
-                        } catch {
-                            print("❌ Failed to ensure Solo jar: \(error)")
-                        }
+                    // Phase 10.1 Module 3.1: Onboarding overlay
+                    if showOnboarding {
+                        OnboardingView(isPresented: $showOnboarding)
+                            .transition(.opacity)
                     }
+                }
             } else {
                 PhoneAuthView()
             }
@@ -179,7 +188,6 @@ struct BudsApp: App {
 }
 
 // MARK: - Firebase Configuration
-
 struct FirebaseConfiguration {
     static func configureFirebase() {
         print("🔧 [DEBUG] FirebaseConfiguration.configureFirebase() called")

@@ -83,25 +83,48 @@ actor InboxManager {
         print("📥 [INBOX] Sender: \(message.senderDID)")
         print("📥 [INBOX] Receipt CID: \(message.receiptCID)")
 
-        let repository = MemoryRepository()
-
-        // Check if already processed (idempotency protection)
-        print("🔍 [INBOX] Checking if message already processed...")
-        let alreadyProcessed = try await repository.isMessageProcessed(relayMessageId: message.messageId)
-        if alreadyProcessed {
-            print("⚠️  [INBOX] Message \(message.messageId) already processed, skipping")
-            // Still delete from relay to clean up
-            try await RelayClient.shared.deleteMessage(messageId: message.messageId)
-            return
-        }
-        print("✅ [INBOX] Message is new, proceeding with decryption")
-
         // Decrypt and verify sender is in Circle
         let rawCBOR = try await decryptAndVerify(message)
 
-        // Store receipt in database with relay message ID and raw CBOR
-        // Use metadata from the EncryptedMessage (receiptCID, senderDID, etc.)
-        print("🗄️  [INBOX] Storing receipt in database...")
+        // Decode receipt to determine type
+        let receiptFields = try ReceiptCanonicalizer.decodeReceipt(from: rawCBOR)
+        let receiptType = receiptFields.receiptType
+
+        print("📦 [INBOX] Receipt type: \(receiptType)")
+
+        // Route to appropriate handler based on receipt type
+        switch receiptType {
+        case ReceiptType.sessionCreated, ReceiptType.sessionEdited, ReceiptType.sessionDeleted:
+            try await processMemoryReceipt(message, rawCBOR: rawCBOR)
+
+        case ReceiptType.reactionAdded:
+            try await processReactionReceipt(message, rawCBOR: rawCBOR)
+
+        default:
+            print("⚠️ [INBOX] Unknown receipt type: \(receiptType), skipping")
+        }
+
+        // Mark message as delivered on relay
+        print("🗑️  [INBOX] Deleting message from relay...")
+        try await RelayClient.shared.deleteMessage(messageId: message.messageId)
+
+        print("✅ [INBOX] Message \(message.messageId) fully processed")
+    }
+
+    // Process memory (session) receipt
+    private func processMemoryReceipt(_ message: EncryptedMessage, rawCBOR: Data) async throws {
+        let repository = MemoryRepository()
+
+        // Check if already processed (idempotency protection)
+        print("🔍 [INBOX] Checking if memory already processed...")
+        let alreadyProcessed = try await repository.isMessageProcessed(relayMessageId: message.messageId)
+        if alreadyProcessed {
+            print("⚠️  [INBOX] Memory \(message.messageId) already processed, skipping")
+            return
+        }
+
+        // Store receipt in database
+        print("🗄️  [INBOX] Storing memory receipt...")
         try await repository.storeSharedReceipt(
             receiptCID: message.receiptCID,
             rawCBOR: rawCBOR,
@@ -111,11 +134,28 @@ actor InboxManager {
             relayMessageId: message.messageId
         )
 
-        // Mark message as delivered on relay
-        print("🗑️  [INBOX] Deleting message from relay...")
-        try await RelayClient.shared.deleteMessage(messageId: message.messageId)
+        print("✅ [INBOX] Memory stored")
+    }
 
-        print("✅ [INBOX] Message \(message.messageId) fully processed and stored")
+    // Process reaction receipt (Phase 10.1 Module 1.5)
+    private func processReactionReceipt(_ message: EncryptedMessage, rawCBOR: Data) async throws {
+        let repository = ReactionRepository()
+
+        // Decode reaction payload
+        let receiptFields = try ReceiptCanonicalizer.decodeReceipt(from: rawCBOR)
+        let payload = try ReceiptCanonicalizer.decodeReactionAddedPayload(from: receiptFields.payloadCBOR)
+
+        print("❤️  [INBOX] Reaction: \(payload.reactionType) on memory \(payload.memoryID)")
+
+        // Store reaction in database
+        try await repository.storeReceivedReaction(
+            memoryID: UUID(uuidString: payload.memoryID)!,
+            senderDID: message.senderDID,
+            reactionType: ReactionType(rawValue: payload.reactionType)!,
+            createdAtMs: payload.createdAtMs
+        )
+
+        print("✅ [INBOX] Reaction stored")
     }
 
     // Helper to decrypt and verify message

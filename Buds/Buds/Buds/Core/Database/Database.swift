@@ -75,6 +75,16 @@ final class Database {
             try migrateToJars(db)
         }
 
+        // Migration v6: Reactions system (Phase 10.1 Module 1.4)
+        migrator.registerMigration("v6_reactions") { db in
+            try migrateToReactions(db)
+        }
+
+        // Migration v7: Migrate reactions to use sender_did instead of user_phone (Phase 10.1 Module 1.5)
+        migrator.registerMigration("v7_reactions_did") { db in
+            try migrateReactionsToDID(db)
+        }
+
         return migrator
     }
 
@@ -565,6 +575,74 @@ private func migrateToJars(_ db: GRDB.Database) throws {
 
     print("✅ [MIGRATION v5] Migrated \(memoryCount) buds to Solo jar")
     print("🎉 [MIGRATION v5] Migration complete!")
+}
+
+// MARK: - Migration v6 (Phase 10.1 Module 1.4)
+
+private func migrateToReactions(_ db: GRDB.Database) throws {
+    print("📦 Running migration v6: Reactions system")
+
+    // Create reactions table
+    try db.execute(sql: """
+        CREATE TABLE reactions (
+            id TEXT PRIMARY KEY NOT NULL,
+            memory_id TEXT NOT NULL,
+            user_phone TEXT NOT NULL,
+            reaction_type TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            FOREIGN KEY (memory_id) REFERENCES local_receipts(uuid) ON DELETE CASCADE
+        )
+    """)
+
+    // Create index for fast lookup by memory
+    try db.execute(sql: """
+        CREATE INDEX idx_reactions_memory ON reactions(memory_id)
+    """)
+
+    // Create unique constraint: one reaction per user per memory
+    try db.execute(sql: """
+        CREATE UNIQUE INDEX idx_reactions_unique ON reactions(memory_id, user_phone)
+    """)
+
+    print("✅ Migration v6 complete: Reactions table created")
+}
+
+private func migrateReactionsToDID(_ db: GRDB.Database) throws {
+    print("📦 Running migration v7: Migrate reactions to use sender_did")
+
+    // Create new reactions table with sender_did
+    try db.execute(sql: """
+        CREATE TABLE reactions_new (
+            id TEXT PRIMARY KEY NOT NULL,
+            memory_id TEXT NOT NULL,
+            sender_did TEXT NOT NULL,
+            reaction_type TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            FOREIGN KEY (memory_id) REFERENCES local_receipts(uuid) ON DELETE CASCADE
+        )
+    """)
+
+    // Copy existing data - map user_phone to sender_did
+    // Since we don't have a phone→DID mapping yet, we'll start fresh
+    // (This is OK for beta as reactions haven't been widely used yet)
+    print("⚠️  Note: Existing reactions will be cleared (no phone→DID mapping available)")
+
+    // Drop old table
+    try db.execute(sql: "DROP TABLE reactions")
+
+    // Rename new table
+    try db.execute(sql: "ALTER TABLE reactions_new RENAME TO reactions")
+
+    // Create indexes on new table
+    try db.execute(sql: """
+        CREATE INDEX idx_reactions_memory ON reactions(memory_id)
+    """)
+
+    try db.execute(sql: """
+        CREATE UNIQUE INDEX idx_reactions_unique ON reactions(memory_id, sender_did)
+    """)
+
+    print("✅ Migration v7 complete: Reactions now use sender_did")
 }
 
 struct DatabaseError: Error {

@@ -1,8 +1,8 @@
 # Buds End-to-End Encryption Design
 
-**Last Updated:** December 20, 2025
-**Version:** v0.1 (Phase 6 Ready)
-**Security Level:** Private Circle Sharing (12 max)
+**Last Updated:** December 30, 2025
+**Version:** v0.1 (Phase 10.1 - Multi-User Reactions)
+**Security Level:** Private Circle & Jar Sharing (12 max)
 
 ---
 
@@ -581,6 +581,89 @@ func revokeDevice(_ deviceId: String) async throws {
 - [ ] Add device revocation UI
 - [ ] Write unit tests for key wrapping
 - [ ] Audit crypto implementation with external review (before production)
+
+---
+
+## Reactions E2EE (Phase 10.1)
+
+### Overview
+
+Reactions are lightweight E2EE receipts that allow jar members to react to shared memories. Each reaction is a signed receipt encrypted and shared across all jar members using the same E2EE infrastructure as memory sharing.
+
+### Reaction Receipt Types
+
+```
+app.buds.memory.reaction.created/v1 - User adds a reaction
+app.buds.memory.reaction.removed/v1 - User removes a reaction
+```
+
+### Reaction Payload Structure
+
+```swift
+struct ReactionPayload: ReceiptPayload {
+    let claimed_time_ms: Int64          // Required: when reaction was created
+    let memory_cid: String              // CID of memory being reacted to
+    let reaction_type: String           // 'heart' | 'fire' | 'laughing' | 'mind_blown' | 'chilled'
+    let jar_id: String                  // Jar context for E2EE distribution
+}
+```
+
+### Encryption Flow
+
+**Creating a Reaction:**
+
+```
+1. User taps reaction emoji (e.g., ❤️) on a shared memory
+2. Create ReactionPayload with memory_cid, reaction_type, jar_id
+3. Generate UCRHeader receipt (signed with user's Ed25519 key)
+4. Encrypt receipt using same E2EE flow as memory sharing:
+   - Generate ephemeral AES-256 key
+   - Encrypt raw_cbor with AES-GCM
+   - Wrap AES key for each jar member's devices
+5. Send encrypted reaction via relay
+6. Each jar member's device receives + decrypts reaction
+7. Insert into local `reactions` table
+```
+
+### Toggle Behavior
+
+Reactions use **toggle semantics**:
+- Tap once → Add reaction (create `reaction.created/v1` receipt)
+- Tap again → Remove reaction (create `reaction.removed/v1` receipt)
+- Each user can have one reaction per type per memory
+- Removed reactions are tombstoned (not deleted from database)
+
+### Performance Optimization
+
+Reactions are **small payloads** (~200 bytes), making E2EE overhead minimal:
+
+| Operation | Estimated Time (12 members, 2 devices each) |
+|-----------|---------------------------------------------|
+| Encrypt reaction payload | ~0.3 ms |
+| Wrap AES key (24x) | ~12 ms |
+| Total encryption | **~12.3 ms** |
+
+**Decryption** per recipient: ~1.3 ms (same as memory decryption)
+
+### UI Aggregation
+
+**Summary Display:**
+```swift
+struct ReactionSummary {
+    let type: ReactionType              // .heart, .fire, etc.
+    let count: Int                      // Number of users who reacted
+    let senderDIDs: [String]            // List of DIDs (for future "who reacted" feature)
+}
+```
+
+The UI fetches all reactions for a memory and aggregates by type to show counts (e.g., "❤️ 3  🔥 2").
+
+### Future Enhancement: "Who Reacted"
+
+**Press and hold reaction bubble** to see which jar members reacted:
+- Query `reactions` table for `memory_id` + `reaction_type`
+- Join with `circles` table to get display names
+- Show list of members who reacted (E2EE preserving)
 
 ---
 

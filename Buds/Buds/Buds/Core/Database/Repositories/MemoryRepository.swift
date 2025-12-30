@@ -198,7 +198,7 @@ struct MemoryRepository {
                 let imageCIDs = (try? JSONDecoder().decode([String].self, from: imageCIDsJSON.data(using: .utf8)!)) ?? []
                 let thumbnailCID = imageCIDs.first
 
-                // Build lightweight item
+                // Build lightweight item (Phase 10.1: added effects + notes for enrichment)
                 return MemoryListItem(
                     id: UUID(uuidString: row["uuid"] as String) ?? UUID(),
                     strainName: payload.productName,
@@ -206,7 +206,9 @@ struct MemoryRepository {
                     rating: payload.rating,
                     createdAt: Date(timeIntervalSince1970: row["received_at"] as Double),
                     thumbnailCID: thumbnailCID,
-                    jarID: row["jar_id"] as String
+                    jarID: row["jar_id"] as String,
+                    effects: payload.effects ?? [],
+                    notes: payload.notes
                 )
             }
         }
@@ -296,6 +298,79 @@ struct MemoryRepository {
 
     // MARK: - Update
 
+    /// Update memory (creates new receipt with same UUID - immutable pattern)
+    func update(
+        id: UUID,
+        strainName: String,
+        productType: String,
+        rating: Int,
+        effects: [String],
+        flavors: [String],
+        notes: String?,
+        images: [Data]
+    ) async throws {
+        print("📝 Updating memory \(id): \(strainName)")
+
+        // Build updated payload
+        let payload = SessionPayload(
+            claimedTimeMs: Int64(Date().timeIntervalSince1970 * 1000),
+            productName: strainName,
+            productType: productType,
+            rating: rating,
+            notes: notes,
+            brand: nil,
+            thcPercent: nil,
+            cbdPercent: nil,
+            amountGrams: nil,
+            effects: effects,
+            consumptionMethod: nil,
+            locationCID: nil
+        )
+
+        // Create new receipt (immutable)
+        let (newCID, _) = try await receiptManager.createSessionReceipt(
+            type: ReceiptType.sessionCreated,
+            payload: payload
+        )
+
+        // Store new images in blobs table and get CIDs
+        let now = Date().timeIntervalSince1970
+        try await db.writeAsync { db in
+            var imageCIDs: [String] = []
+
+            // Store each image as a blob
+            for imageData in images {
+                let cid = try self.generateImageCID(data: imageData)
+
+                // Insert into blobs table
+                try db.execute(
+                    sql: """
+                        INSERT OR REPLACE INTO blobs (cid, data, mime_type, size_bytes, created_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                    arguments: [cid, imageData, "image/jpeg", imageData.count, now]
+                )
+
+                imageCIDs.append(cid)
+            }
+
+            // Update local_receipts with new header_cid and image_cids
+            let imageCIDsJSON = try JSONEncoder().encode(imageCIDs)
+            let imageCIDsString = String(data: imageCIDsJSON, encoding: .utf8) ?? "[]"
+
+            try db.execute(
+                sql: """
+                    UPDATE local_receipts
+                    SET header_cid = ?, image_cids = ?, updated_at = ?
+                    WHERE uuid = ?
+                    """,
+                arguments: [newCID, imageCIDsString, now, id.uuidString]
+            )
+        }
+
+        print("✅ Memory updated: \(strainName), new CID: \(newCID)")
+    }
+
     /// Toggle favorite status
     func toggleFavorite(id: UUID) async throws {
         try db.write { db in
@@ -306,18 +381,64 @@ struct MemoryRepository {
         }
     }
 
+    // MARK: - Move (Phase 10.1 Module 2.3)
+
+    /// Move memory to a different jar
+    func moveToJar(memoryID: UUID, newJarID: String) async throws {
+        try await db.writeAsync { db in
+            try db.execute(
+                sql: "UPDATE local_receipts SET jar_id = ?, updated_at = ? WHERE uuid = ?",
+                arguments: [newJarID, Date().timeIntervalSince1970, memoryID.uuidString]
+            )
+            print("✅ Moved memory \(memoryID) to jar \(newJarID)")
+        }
+    }
+
     // MARK: - Delete
 
-    /// Delete memory (creates tombstone receipt)
+    /// Delete memory (Phase 10.1 Module 1.3)
+    /// Cleans up: local_receipts entry, associated blobs (images), reactions (Phase 10.1 Module 1.4)
     func delete(id: UUID) async throws {
-        // TODO: Create tombstone receipt for proper deletion
-        // For now, just soft delete from local_receipts
+        // TODO Phase 11: Create tombstone receipt for proper E2EE deletion sync
+        // For now: delete local data only (blobs + reactions + local_receipts)
 
-        try db.write { db in
+        try await db.writeAsync { db in
+            // 1. Get image CIDs before deleting
+            let imageCIDsJSON = try String.fetchOne(
+                db,
+                sql: "SELECT image_cids FROM local_receipts WHERE uuid = ?",
+                arguments: [id.uuidString]
+            ) ?? "[]"
+
+            let imageCIDs = try JSONDecoder().decode([String].self, from: imageCIDsJSON.data(using: .utf8)!)
+
+            // 2. Delete associated blobs
+            for cid in imageCIDs {
+                try db.execute(
+                    sql: "DELETE FROM blobs WHERE cid = ?",
+                    arguments: [cid]
+                )
+            }
+
+            // 3. Delete reactions (Phase 10.1 Module 1.4)
+            let reactionCount = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM reactions WHERE memory_id = ?",
+                arguments: [id.uuidString]
+            ) ?? 0
+
+            try db.execute(
+                sql: "DELETE FROM reactions WHERE memory_id = ?",
+                arguments: [id.uuidString]
+            )
+
+            // 4. Delete local_receipts entry
             try db.execute(
                 sql: "DELETE FROM local_receipts WHERE uuid = ?",
                 arguments: [id.uuidString]
             )
+
+            print("✅ Deleted memory \(id) and cleaned up \(imageCIDs.count) blobs, \(reactionCount) reactions")
         }
     }
 

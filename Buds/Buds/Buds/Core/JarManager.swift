@@ -95,6 +95,19 @@ class JarManager: ObservableObject {
         return jar
     }
 
+    // Phase 10.1 Module 2.1: Update jar
+    func updateJar(jarID: String, name: String, description: String? = nil) async throws {
+        try await JarRepository.shared.updateJar(
+            jarID: jarID,
+            name: name,
+            description: description
+        )
+
+        // Metadata change only - refresh global to update UI
+        await refreshGlobal()
+        print("✅ Updated jar: \(name)")
+    }
+
     func deleteJar(id: String) async throws {
         try await JarRepository.shared.deleteJar(id: id)
         // Phase 10 Step 3: Structural change requires global refresh

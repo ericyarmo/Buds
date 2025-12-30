@@ -1,7 +1,7 @@
 # Buds Receipt Schemas
 
-**Last Updated:** December 16, 2025
-**Version:** v0.1
+**Last Updated:** December 30, 2025
+**Version:** v0.1 (Phase 10.1 - Added Reactions)
 
 ---
 
@@ -255,9 +255,78 @@ Examples:
 
 ---
 
-### 4. Location Receipts (Privacy-Protected)
+### 4. Reaction Receipts (Phase 10.1)
 
-#### 4.1 `app.buds.location/v1`
+#### 4.1 `app.buds.memory.reaction.created/v1`
+
+**Purpose**: React to a shared memory with an emoji
+
+**Payload Schema**:
+
+```swift
+{
+    "claimed_time_ms": Int64,         // When reaction was created
+    "memory_cid": String,             // CID of memory being reacted to
+    "reaction_type": String,          // 'heart' | 'fire' | 'laughing' | 'mind_blown' | 'chilled'
+    "jar_id": String,                 // Jar context for E2EE distribution
+}
+```
+
+**Supported Reaction Types**:
+- `heart` - ❤️ Love it
+- `fire` - 🔥 Fire
+- `laughing` - 😂 Laughing
+- `mind_blown` - 🤯 Mind blown
+- `chilled` - 😌 Chilled
+
+**Example**:
+
+```json
+{
+    "claimed_time_ms": 1704857000000,
+    "memory_cid": "bafyreiabc123...",
+    "reaction_type": "heart",
+    "jar_id": "A7F3C2B1-8D4E-4F9A-B2C6-7E8F9A0B1C2D"
+}
+```
+
+#### 4.2 `app.buds.memory.reaction.removed/v1`
+
+**Purpose**: Remove a reaction from a memory (toggle off)
+
+**Payload Schema**:
+
+```swift
+{
+    "claimed_time_ms": Int64,         // When reaction was removed
+    "memory_cid": String,             // CID of memory
+    "reaction_type": String,          // Which reaction to remove
+    "jar_id": String,                 // Jar context
+}
+```
+
+**Example**:
+
+```json
+{
+    "claimed_time_ms": 1704858000000,
+    "memory_cid": "bafyreiabc123...",
+    "reaction_type": "heart",
+    "jar_id": "A7F3C2B1-8D4E-4F9A-B2C6-7E8F9A0B1C2D"
+}
+```
+
+**Notes**:
+- Reactions are E2EE receipts shared across all jar members
+- Each user can have one reaction per type per memory (toggle behavior)
+- Removed reactions create tombstone receipts (not deleted from database)
+- UI aggregates reactions by type to show counts (e.g., "❤️ 3  🔥 2")
+
+---
+
+### 5. Location Receipts (Privacy-Protected)
+
+#### 5.1 `app.buds.location/v1`
 
 **Purpose**: Store location data separately (can be shared with different granularity)
 
@@ -567,6 +636,7 @@ When schema changes:
 | Session | 50 KB |
 | Circle management | 10 KB |
 | Sharing | 5 KB |
+| Reaction | 1 KB |
 | Location | 5 KB |
 | Preferences | 20 KB |
 | Daily summary | 50 KB |

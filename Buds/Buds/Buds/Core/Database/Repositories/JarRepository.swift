@@ -66,6 +66,20 @@ final class JarRepository {
         return jar
     }
 
+    // Phase 10.1 Module 2.1: Update jar metadata
+    func updateJar(jarID: String, name: String, description: String?) async throws {
+        try await Database.shared.writeAsync { db in
+            try db.execute(
+                sql: """
+                    UPDATE jars
+                    SET name = ?, description = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                arguments: [name, description, Date().timeIntervalSince1970, jarID]
+            )
+        }
+    }
+
     /// Safe jar deletion: moves memories to Solo jar, deletes members, then deletes jar
     /// CRITICAL: Solo jar cannot be deleted (system jar)
     func deleteJar(id: String) async throws {

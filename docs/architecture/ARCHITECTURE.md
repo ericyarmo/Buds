@@ -1,8 +1,8 @@
 # Buds v0.1 — System Architecture
 
-**Last Updated:** December 20, 2025
-**Status:** Phase 5 Complete (Circle Mechanics) — Phase 6 Next (E2EE Relay)
-**Target:** TestFlight v2 with E2EE Sharing (Phase 6-7)
+**Last Updated:** December 30, 2025
+**Status:** Phase 10.1 In Progress (Beta Preparation) — Modules 1.4, 1.5, 2.3 Complete
+**Target:** TestFlight Beta with Multi-User Reactions & Jar Management
 
 ---
 
@@ -12,13 +12,14 @@
 2. [System Overview](#system-overview)
 3. [Core Principles](#core-principles)
 4. [Architecture Layers](#architecture-layers)
-5. [Circle Architecture](#circle-architecture)
-6. [Multi-Device E2EE Architecture](#multi-device-e2ee-architecture)
-7. [Technology Stack](#technology-stack)
-8. [Data Flow](#data-flow)
-9. [Security Model](#security-model)
-10. [Performance Requirements](#performance-requirements)
-11. [Related Documentation](#related-documentation)
+5. [Jar Architecture](#jar-architecture)
+6. [Circle Architecture](#circle-architecture)
+7. [Multi-Device E2EE Architecture](#multi-device-e2ee-architecture)
+8. [Technology Stack](#technology-stack)
+9. [Data Flow](#data-flow)
+10. [Security Model](#security-model)
+11. [Performance Requirements](#performance-requirements)
+12. [Related Documentation](#related-documentation)
 
 ---
 
@@ -157,6 +158,9 @@ struct UCRHeader: Codable {
 - `app.buds.session.updated/v1` - Edit session (creates new receipt with parentCID)
 - `app.buds.memory.shared/v1` - Share to Circle
 - `app.buds.memory.unshared/v1` - Revoke share
+- `app.buds.memory.deleted/v1` - Tombstone receipt for deleted memory
+- `app.buds.memory.reaction.created/v1` - Add reaction to memory (Phase 10.1)
+- `app.buds.memory.reaction.removed/v1` - Remove reaction from memory (Phase 10.1)
 - `app.buds.circle.invite.created/v1` - Create invite
 - `app.buds.circle.invite.accepted/v1` - Accept invite
 - `app.buds.circle.member.removed/v1` - Remove from Circle
@@ -245,6 +249,48 @@ struct Citation {
 ```
 
 ---
+
+## Jar Architecture (Phase 10)
+
+### Local-First Memory Organization
+
+Buds implements a **jar-based memory organization system** where users can create multiple jars to organize their memories. Each jar can be private (solo) or shared with Circle members.
+
+#### Jar Model
+
+```swift
+struct Jar: Identifiable {
+    let id: String                         // UUID or "solo" for default jar
+    var name: String                       // User-defined name
+    var emoji: String                      // Visual identifier
+    var createdAt: Date
+    var updatedAt: Date
+    var memberCount: Int                   // Number of members with access
+    var budCount: Int                      // Number of memories in jar
+}
+```
+
+#### Default "Solo" Jar
+
+- Every user has a default `solo` jar (ID: "solo")
+- Private to the user (not shared with Circle)
+- Cannot be deleted
+- All memories default to solo jar unless explicitly added to a shared jar
+
+#### Shared Jars
+
+- User can create additional jars to share with Circle members
+- Max 12 members per jar (same as Circle limit)
+- Members are added via jar invites (similar to Circle invites)
+- Memories in shared jars are visible to all members
+- Reactions to memories in shared jars are E2EE across all jar members
+
+#### Move Between Jars
+
+- Memories can be moved from one jar to another
+- Moving creates an `app.buds.memory.moved/v1` receipt
+- UI shows "Move to Jar" option in memory detail view
+- Solo jar ↔ Shared jar moves respect privacy (user confirmation required)
 
 ## Circle Architecture
 

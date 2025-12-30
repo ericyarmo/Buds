@@ -17,6 +17,8 @@ struct ProfileView: View {
     @State private var showingDeleteAlert = false
     @State private var isDeleting = false
     @State private var databaseSize: String = "Calculating..."
+    @State private var showingResetAlert = false
+    @State private var isResetting = false
 
     var body: some View {
         NavigationView {
@@ -39,6 +41,9 @@ struct ProfileView: View {
 
                     // App info
                     appInfoSection
+
+                    // Privacy & Legal
+                    privacyLegalSection
 
                     // Debug section (Phase 10 testing)
                     debugSection
@@ -69,6 +74,14 @@ struct ProfileView: View {
                 }
             } message: {
                 Text("This will permanently delete your account and all data. This action cannot be undone.")
+            }
+            .alert("Reset All Data", isPresented: $showingResetAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Reset", role: .destructive) {
+                    resetAllData()
+                }
+            } message: {
+                Text("This will delete all local data (database, keychain, settings). The app will need to be restarted. This is for testing only.")
             }
         }
     }
@@ -307,6 +320,59 @@ struct ProfileView: View {
         }
     }
 
+    // MARK: - Privacy & Legal Section
+
+    private var privacyLegalSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SectionHeader(title: "Privacy & Legal", icon: "hand.raised.fill")
+
+            VStack(spacing: 0) {
+                Link(destination: URL(string: "https://getbuds.app/privacy")!) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "lock.shield.fill")
+                            .foregroundColor(.budsPrimary)
+                            .frame(width: 24)
+
+                        Text("Privacy Policy")
+                            .font(.budsBody)
+                            .foregroundColor(.budsText)
+
+                        Spacer()
+
+                        Image(systemName: "arrow.up.right")
+                            .foregroundColor(.budsTextSecondary)
+                            .font(.system(size: 14))
+                    }
+                    .padding()
+                }
+
+                Divider()
+                    .padding(.leading, 44)
+
+                Link(destination: URL(string: "https://getbuds.app/terms")!) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundColor(.budsPrimary)
+                            .frame(width: 24)
+
+                        Text("Terms of Service")
+                            .font(.budsBody)
+                            .foregroundColor(.budsText)
+
+                        Spacer()
+
+                        Image(systemName: "arrow.up.right")
+                            .foregroundColor(.budsTextSecondary)
+                            .font(.system(size: 14))
+                    }
+                    .padding()
+                }
+            }
+            .background(Color.budsCard)
+            .cornerRadius(12)
+        }
+    }
+
     // MARK: - Debug Section (Phase 10 Testing)
 
     private var debugSection: some View {
@@ -342,6 +408,68 @@ struct ProfileView: View {
                     .cornerRadius(12)
                 }
                 .buttonStyle(.plain)
+
+                // Stress Test (Module 5 - uncomment after adding StressTestView to Xcode)
+                /*
+                NavigationLink(destination: StressTestView()) {
+                    HStack {
+                        Image(systemName: "chart.bar.fill")
+                            .foregroundColor(.budsPrimary)
+                            .frame(width: 24)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Stress Test")
+                                .font(.budsBody)
+                                .foregroundColor(.budsText)
+
+                            Text("Generate 100+ test buds for performance testing")
+                                .font(.budsCaption)
+                                .foregroundColor(.budsTextSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color.budsCard)
+                    .cornerRadius(12)
+                }
+                */
+
+                // Reset All Data
+                Button {
+                    showingResetAlert = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash.circle.fill")
+                            .foregroundColor(.red)
+                            .frame(width: 24)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Reset All Data")
+                                .font(.budsBody)
+                                .foregroundColor(.red)
+
+                            Text("Delete database, keychain, and settings")
+                                .font(.budsCaption)
+                                .foregroundColor(.budsTextSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color.budsCard)
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+                .disabled(isResetting)
             }
 
             Text("⚠️ Run E2EE test before TestFlight upload")
@@ -415,6 +543,20 @@ struct ProfileView: View {
                 print("❌ Delete account failed: \(error)")
             }
             isDeleting = false
+        }
+    }
+
+    private func resetAllData() {
+        isResetting = true
+
+        Task {
+            do {
+                try await DataResetUtility.resetAllData()
+                // Note: App needs to be restarted for changes to take effect
+            } catch {
+                print("❌ Reset all data failed: \(error)")
+            }
+            isResetting = false
         }
     }
 }

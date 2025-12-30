@@ -18,17 +18,11 @@ struct MainTabView: View {
                 }
                 .tag(0)
 
-            CircleView()  // Keep for safer rollback (Phase 9b)
-                .tabItem {
-                    Label("Circle", systemImage: "person.2.fill")
-                }
-                .tag(1)
-
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(2)
+                .tag(1)
         }
         .tint(.budsPrimary)
     }

@@ -1,8 +1,8 @@
 # Buds Database Schema (GRDB)
 
-**Last Updated:** December 20, 2025
+**Last Updated:** December 30, 2025
 **Database:** SQLite via GRDB
-**Version:** v0.1 (Migration v3)
+**Version:** v0.1 (Migration v5 - Added reactions, jar_members)
 
 ---
 
@@ -22,12 +22,14 @@ Buds uses GRDB for local-first storage with the following design principles:
 
 1. [Core Tables](#core-tables)
 2. [Circle Tables](#circle-tables)
-3. [Location Tables](#location-tables)
-4. [Blob Tables](#blob-tables)
-5. [Cache & Index Tables](#cache--index-tables)
-6. [Indexes](#indexes)
-7. [Migrations](#migrations)
-8. [Queries](#common-queries)
+3. [Jar Tables](#jar-tables)
+4. [Reaction Tables](#reaction-tables)
+5. [Location Tables](#location-tables)
+6. [Blob Tables](#blob-tables)
+7. [Cache & Index Tables](#cache--index-tables)
+8. [Indexes](#indexes)
+9. [Migrations](#migrations)
+10. [Queries](#common-queries)
 
 ---
 
@@ -256,6 +258,98 @@ CREATE INDEX idx_received_memories_received ON received_memories(received_at DES
 - After decrypting a shared memory, insert its UCRHeader into `ucr_headers`
 - Then create `received_memories` entry linking to it
 - Can create read-only `local_receipts` entry for display
+
+---
+
+## Jar Tables
+
+### `jars` (Memory Organization)
+
+**Organize memories into private or shared jars (Phase 10)**
+
+```sql
+CREATE TABLE jars (
+    id TEXT PRIMARY KEY NOT NULL,               -- UUID or "solo" for default jar
+    name TEXT NOT NULL,                         -- User-defined name
+    emoji TEXT NOT NULL,                        -- Visual identifier (e.g., "🌿")
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+
+CREATE INDEX idx_jars_created ON jars(created_at DESC);
+```
+
+**Notes**:
+- Every user has a default `solo` jar (ID: "solo", private)
+- Additional jars can be created to organize and share memories
+- Jar cannot be deleted if it contains memories
+- See `jar_members` table for sharing with Circle
+
+---
+
+### `jar_members` (Jar Sharing)
+
+**Track which Circle members have access to which jars (Phase 10)**
+
+```sql
+CREATE TABLE jar_members (
+    id TEXT PRIMARY KEY NOT NULL,               -- UUID
+    jar_id TEXT NOT NULL,                       -- FK to jars.id
+    member_did TEXT NOT NULL,                   -- DID of member
+    role TEXT NOT NULL,                         -- 'owner' | 'member'
+    status TEXT NOT NULL,                       -- 'pending' | 'active' | 'removed'
+    added_at REAL NOT NULL,
+    accepted_at REAL,
+    removed_at REAL,
+    FOREIGN KEY (jar_id) REFERENCES jars(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_did) REFERENCES circles(did) ON DELETE CASCADE,
+    UNIQUE(jar_id, member_did)
+);
+
+CREATE INDEX idx_jar_members_jar ON jar_members(jar_id);
+CREATE INDEX idx_jar_members_did ON jar_members(member_did);
+CREATE INDEX idx_jar_members_status ON jar_members(status);
+```
+
+**Notes**:
+- Max 12 members per jar (enforced in app layer)
+- Owner role cannot be changed or removed
+- Jar memories are visible to all active members
+- Reactions to jar memories are E2EE across all jar members
+
+---
+
+## Reaction Tables
+
+### `reactions` (Memory Reactions - Phase 10.1)
+
+**Track E2EE reactions to memories in shared jars**
+
+```sql
+CREATE TABLE reactions (
+    id TEXT PRIMARY KEY NOT NULL,               -- UUID
+    memory_id TEXT NOT NULL,                    -- FK to local_receipts(uuid) - STABLE across edits
+    sender_did TEXT NOT NULL,                   -- Who reacted (DID)
+    reaction_type TEXT NOT NULL,                -- 'heart' | 'fire' | 'laughing' | 'mind_blown' | 'chilled'
+    created_at REAL NOT NULL,                   -- When reaction was created
+    FOREIGN KEY (memory_id) REFERENCES local_receipts(uuid) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_reactions_memory ON reactions(memory_id);
+CREATE UNIQUE INDEX idx_reactions_unique ON reactions(memory_id, sender_did);
+```
+
+**Notes**:
+- **CRITICAL**: `memory_id` references `local_receipts(uuid)`, NOT `ucr_headers(cid)`
+  - This means reactions stay valid even when memory is edited (new CID created)
+  - The UUID is stable, the CID changes with each edit
+- Each user can have ONE reaction per memory (toggle behavior)
+  - Same reaction type → Remove (toggle off)
+  - Different reaction type → Replace with new type
+- Reactions are E2EE receipts shared across jar members
+- Future: Will add `receipt_cid`, `jar_id`, `removed_at` for full E2EE tombstoning
+- UI aggregates reactions by type to show counts
+- Future: Press and hold reaction to see who reacted
 
 ---
 

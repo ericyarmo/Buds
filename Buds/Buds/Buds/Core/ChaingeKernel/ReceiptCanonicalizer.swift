@@ -97,6 +97,31 @@ enum ReceiptCanonicalizer {
         return try enc.encode(.map(pairs))
     }
 
+    /// Encode ReactionAddedPayload to canonical CBOR map (Phase 10.1 Module 1.5)
+    static func encodeReactionAddedPayload(_ payload: ReactionAddedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        let pairs: [(CBORValue, CBORValue)] = [
+            (.text("memory_id"), .text(payload.memoryID)),
+            (.text("reaction_type"), .text(payload.reactionType)),
+            (.text("created_at_ms"), .int(payload.createdAtMs))
+        ]
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode ReactionRemovedPayload to canonical CBOR map (Phase 10.1 Module 1.5)
+    static func encodeReactionRemovedPayload(_ payload: ReactionRemovedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        let pairs: [(CBORValue, CBORValue)] = [
+            (.text("memory_id"), .text(payload.memoryID)),
+            (.text("reaction_type"), .text(payload.reactionType))
+        ]
+
+        return try enc.encode(.map(pairs))
+    }
+
     // MARK: - Decoding
 
     /// Decode raw CBOR to extract receipt fields
@@ -265,6 +290,66 @@ enum ReceiptCanonicalizer {
             effects: effects,
             consumptionMethod: consumptionMethod,
             locationCID: locationCID
+        )
+    }
+
+    /// Decode ReactionAddedPayload from CBOR (Phase 10.1 Module 1.5)
+    static func decodeReactionAddedPayload(from cborData: Data) throws -> ReactionAddedPayload {
+        let decoder = CBORDecoder()
+        let value = try decoder.decode(cborData)
+
+        guard case .map(let pairs) = value else {
+            throw CBORDecodeError.invalidStructure
+        }
+
+        var fields: [String: CBORValue] = [:]
+        for (key, val) in pairs {
+            guard case .text(let keyStr) = key else { continue }
+            fields[keyStr] = val
+        }
+
+        guard case .text(let memoryID) = fields["memory_id"] else {
+            throw CBORDecodeError.missingRequiredField("memory_id")
+        }
+        guard case .text(let reactionType) = fields["reaction_type"] else {
+            throw CBORDecodeError.missingRequiredField("reaction_type")
+        }
+        guard case .int(let createdAtMs) = fields["created_at_ms"] else {
+            throw CBORDecodeError.missingRequiredField("created_at_ms")
+        }
+
+        return ReactionAddedPayload(
+            memoryID: memoryID,
+            reactionType: reactionType,
+            createdAtMs: createdAtMs
+        )
+    }
+
+    /// Decode ReactionRemovedPayload from CBOR (Phase 10.1 Module 1.5)
+    static func decodeReactionRemovedPayload(from cborData: Data) throws -> ReactionRemovedPayload {
+        let decoder = CBORDecoder()
+        let value = try decoder.decode(cborData)
+
+        guard case .map(let pairs) = value else {
+            throw CBORDecodeError.invalidStructure
+        }
+
+        var fields: [String: CBORValue] = [:]
+        for (key, val) in pairs {
+            guard case .text(let keyStr) = key else { continue }
+            fields[keyStr] = val
+        }
+
+        guard case .text(let memoryID) = fields["memory_id"] else {
+            throw CBORDecodeError.missingRequiredField("memory_id")
+        }
+        guard case .text(let reactionType) = fields["reaction_type"] else {
+            throw CBORDecodeError.missingRequiredField("reaction_type")
+        }
+
+        return ReactionRemovedPayload(
+            memoryID: memoryID,
+            reactionType: reactionType
         )
     }
 }

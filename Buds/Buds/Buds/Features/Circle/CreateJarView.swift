@@ -8,6 +8,9 @@
 import SwiftUI
 
 struct CreateJarView: View {
+    let jarToEdit: Jar?  // Phase 10.1 Module 2.1: Edit mode support
+    let onSave: (() -> Void)?  // Callback after save
+
     @Environment(\.dismiss) var dismiss
     @StateObject private var jarManager = JarManager.shared
 
@@ -15,6 +18,17 @@ struct CreateJarView: View {
     @State private var description: String = ""
     @State private var isCreating = false
     @State private var errorMessage: String?
+
+    private var isEditMode: Bool {
+        jarToEdit != nil
+    }
+
+    init(jarToEdit: Jar? = nil, onSave: (() -> Void)? = nil) {
+        self.jarToEdit = jarToEdit
+        self.onSave = onSave
+        _name = State(initialValue: jarToEdit?.name ?? "")
+        _description = State(initialValue: jarToEdit?.description ?? "")
+    }
 
     var body: some View {
         NavigationView {
@@ -40,7 +54,7 @@ struct CreateJarView: View {
                 }
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle("Create Jar")
+            .navigationTitle(isEditMode ? "Edit Jar" : "Create Jar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -51,8 +65,8 @@ struct CreateJarView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        Task { await createJar() }
+                    Button(isEditMode ? "Save" : "Create") {
+                        Task { await saveJar() }
                     }
                     .disabled(name.isEmpty || isCreating)
                     .foregroundColor(.budsPrimary)
@@ -61,7 +75,7 @@ struct CreateJarView: View {
         }
     }
 
-    private func createJar() async {
+    private func saveJar() async {
         guard !name.isEmpty else {
             errorMessage = "Name is required"
             return
@@ -71,11 +85,22 @@ struct CreateJarView: View {
         errorMessage = nil
 
         do {
-            _ = try await jarManager.createJar(
-                name: name,
-                description: description.isEmpty ? nil : description
-            )
+            if let jar = jarToEdit {
+                // Edit mode: Update existing jar
+                try await jarManager.updateJar(
+                    jarID: jar.id,
+                    name: name,
+                    description: description.isEmpty ? nil : description
+                )
+            } else {
+                // Create mode: Create new jar
+                _ = try await jarManager.createJar(
+                    name: name,
+                    description: description.isEmpty ? nil : description
+                )
+            }
 
+            onSave?()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

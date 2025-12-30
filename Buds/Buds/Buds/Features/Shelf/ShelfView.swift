@@ -7,15 +7,25 @@
 
 import SwiftUI
 
+// Identifiable wrapper for jar ID to avoid @State timing issues with sheets
+struct JarSelection: Identifiable {
+    let id: String
+    var jarID: String { id }
+}
+
 struct ShelfView: View {
     @ObservedObject var jarManager = JarManager.shared  // Only parent observes
     @State private var showingCreateJar = false
-    @State private var showCreateMemory = false
+    @State private var showJarPicker = false           // Phase 10.1: Show jar picker
+    @State private var jarSelection: JarSelection?     // Phase 10.1: Jar selected for create (drives sheet)
+    @State private var memoryToEnrich: UUID?           // Phase 10.1: Memory to enrich
     @State private var jarToDelete: Jar?
     @State private var showDeleteConfirmation = false
     @State private var deleteError: String?
     @State private var showDeleteError = false
     @State private var toast: Toast?  // Phase 10 Step 5: Toast notifications
+    @State private var jarToEdit: Jar?  // Phase 10.1 Module 2.1: Edit jar
+    @State private var showingEditJar = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 16),
@@ -54,16 +64,60 @@ struct ShelfView: View {
             }) {
                 CreateJarView()
             }
-            .sheet(isPresented: $showCreateMemory) {
+            // Phase 10.1 Module 2.1: Edit jar sheet
+            .sheet(isPresented: $showingEditJar, onDismiss: {
+                Task {
+                    await jarManager.loadJars()
+                    // Show success toast
+                    await MainActor.run {
+                        toast = Toast(message: "Jar updated", style: .success)
+                    }
+                }
+                jarToEdit = nil
+            }) {
+                if let jar = jarToEdit {
+                    CreateJarView(jarToEdit: jar)
+                }
+            }
+            // Phase 10.1: Jar picker sheet
+            .sheet(isPresented: $showJarPicker) {
                 NavigationStack {
-                    JarPickerView()
+                    JarPickerView { jarID in
+                        print("🔍 [DEBUG] Jar selected: \(jarID)")
+                        showJarPicker = false
+                        print("🔍 [DEBUG] showJarPicker = false, creating JarSelection")
+                        // Use .sheet(item:) to capture jar at presentation time
+                        jarSelection = JarSelection(id: jarID)
+                        print("🔍 [DEBUG] jarSelection set: \(jarSelection?.jarID ?? "nil")")
+                    }
+                }
+            }
+            // Phase 10.1: Create → Enrich flow (using .sheet(item:) to capture jar ID)
+            .sheet(item: $jarSelection) { selection in
+                let _ = print("🔍 [DEBUG] Create memory sheet presented with jarID: \(selection.jarID)")
+                NavigationStack {
+                    CreateMemoryView(jarID: selection.jarID) { createdMemoryID in
+                        print("🔍 [DEBUG] Memory created: \(createdMemoryID), showing enrich view")
+                        // On save complete, show enrich view
+                        memoryToEnrich = createdMemoryID
+                    }
+                }
+            }
+            .sheet(isPresented: Binding(
+                get: { memoryToEnrich != nil },
+                set: { if !$0 { memoryToEnrich = nil } }
+            )) {
+                if let memoryID = memoryToEnrich {
+                    NavigationStack {
+                        EditMemoryView(memoryID: memoryID, isEnrichMode: true)
+                    }
                 }
             }
             .overlay(alignment: .bottomTrailing) {
                 Button {
                     // Phase 10 Step 4: Haptic feedback on FAB tap
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showCreateMemory = true
+                    showJarPicker = true  // Phase 10.1: Show jar picker instead
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 56))
@@ -119,6 +173,16 @@ struct ShelfView: View {
                     .contextMenu {
                         // Only allow deletion for non-Solo jars
                         let isSolo = jar.name.trimmingCharacters(in: .whitespaces).lowercased() == "solo"
+
+                        // Phase 10.1 Module 2.1: Edit jar (all jars including Solo)
+                        Button {
+                            jarToEdit = jar
+                            showingEditJar = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Label("Edit Jar", systemImage: "pencil")
+                        }
+
                         if !isSolo {
                             Button(role: .destructive) {
                                 jarToDelete = jar

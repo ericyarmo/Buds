@@ -2,7 +2,8 @@
 //  CreateMemoryView.swift
 //  Buds
 //
-//  Form to create a new cannabis memory
+//  Phase 10.1 Module 1.0: Simplified create flow (name + type only)
+//  After save, auto-navigates to enrich view
 //
 
 import SwiftUI
@@ -10,199 +11,101 @@ import Combine
 
 struct CreateMemoryView: View {
     let jarID: String
+    let onSaveComplete: ((UUID) -> Void)?  // Callback with created memory ID
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: CreateMemoryViewModel
-    @State private var toast: Toast?  // Phase 10 Step 5: Toast for success
 
-    init(jarID: String = "solo") {
+    init(jarID: String = "solo", onSaveComplete: ((UUID) -> Void)? = nil) {
         self.jarID = jarID
+        self.onSaveComplete = onSaveComplete
         _viewModel = StateObject(wrappedValue: CreateMemoryViewModel(jarID: jarID))
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                // Photos (3 max)
-                Section {
-                    PhotoPicker(selectedImages: $viewModel.selectedImages)
-                } header: {
-                    Text("Photos (3 max)")
-                        .font(.budsCaption)
-                }
+        ZStack {
+            Color.black.ignoresSafeArea()
 
-                // Strain Name
-                Section {
-                    TextField("Strain name", text: $viewModel.strainName)
-                        .font(.budsBody)
-                } header: {
-                    Text("Strain")
-                        .font(.budsCaption)
-                }
-
-                // Product Type
-                Section {
-                    Picker("Type", selection: $viewModel.productType) {
-                        ForEach(ProductType.allCases, id: \.self) { type in
-                            Text(type.displayName).tag(type)
-                        }
-                    }
-                    .tint(.budsPrimary)
-                } header: {
-                    Text("Type")
-                }
-
-                // Rating
-                Section {
-                    HStack {
-                        ForEach(1...5, id: \.self) { star in
-                            Button {
-                                viewModel.rating = star
-                            } label: {
-                                Image(systemName: star <= viewModel.rating ? "star.fill" : "star")
-                                    .foregroundColor(star <= viewModel.rating ? .budsWarning : .gray)
-                                    .font(.title2)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                } header: {
-                    Text("Rating")
-                }
-
-                // Notes
-                Section {
-                    ZStack(alignment: .topLeading) {
-                        if viewModel.notes.isEmpty {
-                            Text("How did it make you feel? What did you do?")
-                                .foregroundColor(.secondary)
-                                .font(.budsBody)
-                                .padding(.top, 8)
-                                .padding(.leading, 4)
-                        }
-                        TextEditor(text: $viewModel.notes)
-                            .frame(minHeight: 100)
-                            .font(.budsBody)
-                            .scrollContentBackground(.hidden)
-                            .onChange(of: viewModel.notes) { _, newValue in
-                                if newValue.count > 500 {
-                                    viewModel.notes = String(newValue.prefix(500))
-                                }
-                            }
-                    }
-
-                    HStack {
-                        Spacer()
-                        Text("\(viewModel.notes.count)/500")
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Strain Name (Required)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Strain Name *")
                             .font(.budsCaption)
-                            .foregroundColor(viewModel.notes.count > 450 ? .budsWarning : .secondary)
+                            .foregroundColor(.budsTextSecondary)
+
+                        TextField("Blue Dream", text: $viewModel.strainName)
+                            .font(.budsBody)
+                            .padding()
+                            .background(Color.budsCard)
+                            .cornerRadius(12)
+                            .foregroundColor(.budsText)
                     }
-                } header: {
-                    Text("Notes")
-                }
 
-                // Effects
-                Section {
-                    FlowLayout(spacing: 8) {
-                        ForEach(EffectOption.all, id: \.self) { effect in
-                            effectChip(effect)
-                        }
-                    }
-                } header: {
-                    Text("Effects")
-                }
+                    // Product Type (Optional)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Type")
+                            .font(.budsCaption)
+                            .foregroundColor(.budsTextSecondary)
 
-                // Product Details (Optional)
-                Section {
-                    TextField("Brand (optional)", text: $viewModel.brand)
-                    TextField("THC%", value: $viewModel.thcPercent, format: .number)
-                        .keyboardType(.decimalPad)
-                    TextField("CBD%", value: $viewModel.cbdPercent, format: .number)
-                        .keyboardType(.decimalPad)
-                } header: {
-                    Text("Product Details (optional)")
-                }
-
-                // Consumption Method
-                Section {
-                    Picker("Method", selection: $viewModel.consumptionMethod) {
-                        Text("Not specified").tag(nil as ConsumptionMethod?)
-                        ForEach(ConsumptionMethod.allCases, id: \.self) { method in
-                            Text(method.displayName).tag(method as ConsumptionMethod?)
-                        }
-                    }
-                    .tint(.budsPrimary)
-                } header: {
-                    Text("Method")
-                }
-            }
-            .navigationTitle("New Memory")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task {
-                            let success = await viewModel.save()
-                            if success {
-                                // Phase 10 Step 5: Toast on success
-                                toast = Toast(message: "Bud added!", style: .success)
-                                UINotificationFeedbackGenerator().notificationOccurred(.success)
-
-                                // Delay dismiss slightly to show toast
-                                try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5s
-                                dismiss()
+                        Picker("Type", selection: $viewModel.productType) {
+                            ForEach(ProductType.allCases, id: \.self) { type in
+                                HStack {
+                                    Text(type.icon)
+                                    Text(type.displayName)
+                                }
+                                .tag(type)
                             }
                         }
+                        .pickerStyle(.menu)
+                        .tint(.budsPrimary)
+                        .padding()
+                        .background(Color.budsCard)
+                        .cornerRadius(12)
                     }
-                    .font(.budsBodyBold)
+
+                    Spacer()
+
+                    // Helper text
+                    Text("Add photos, rating, and notes on the next screen")
+                        .font(.budsCaption)
+                        .foregroundColor(.budsTextSecondary)
+                        .multilineTextAlignment(.center)
+
+                    // Continue button
+                    Button {
+                        Task {
+                            await viewModel.save(onComplete: onSaveComplete)
+                            dismiss()
+                        }
+                    } label: {
+                        Text("Continue to Details")
+                            .font(.budsBodyBold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(viewModel.isValid ? Color.budsPrimary : Color.gray)
+                            .cornerRadius(12)
+                    }
                     .disabled(!viewModel.isValid)
                 }
             }
-            .alert("Error", isPresented: $viewModel.showError) {
-                Button("OK") {}
-            } message: {
-                Text(viewModel.errorMessage ?? "Unknown error")
-            }
-            .onDisappear {
-                Task {
-                    // Phase 10 Step 3: Lightweight refresh for single jar
-                    await JarManager.shared.refreshJar(jarID)
+        }
+        .navigationTitle("New Bud")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    dismiss()
                 }
+                .foregroundColor(.budsTextSecondary)
             }
-            .toast($toast)  // Phase 10 Step 5: Toast modifier
         }
-    }
-
-    // MARK: - Effect Chip
-
-    private func effectChip(_ effect: EffectOption) -> some View {
-        Button {
-            viewModel.toggleEffect(effect.rawValue)
-        } label: {
-            Text(effect.rawValue)
-                .font(.budsTag)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    viewModel.selectedEffects.contains(effect.rawValue)
-                        ? effect.color.opacity(0.3)
-                        : Color.gray.opacity(0.1)
-                )
-                .foregroundColor(
-                    viewModel.selectedEffects.contains(effect.rawValue)
-                        ? effect.color
-                        : .secondary
-                )
-                .cornerRadius(BudsRadius.pill)
+        .alert("Error", isPresented: $viewModel.showError) {
+            Button("OK") {}
+        } message: {
+            Text(viewModel.errorMessage ?? "Unknown error")
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -210,16 +113,8 @@ struct CreateMemoryView: View {
 
 @MainActor
 final class CreateMemoryViewModel: ObservableObject {
-    @Published var selectedImages: [Data] = []
     @Published var strainName = ""
     @Published var productType: ProductType = .flower
-    @Published var rating = 3
-    @Published var notes = ""
-    @Published var brand = ""
-    @Published var thcPercent: Double? = nil
-    @Published var cbdPercent: Double? = nil
-    @Published var selectedEffects: [String] = []
-    @Published var consumptionMethod: ConsumptionMethod? = nil
 
     @Published var showError = false
     @Published var errorMessage: String?
@@ -232,139 +127,69 @@ final class CreateMemoryViewModel: ObservableObject {
     }
 
     var isValid: Bool {
-        !strainName.isEmpty && rating > 0
+        !strainName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    func toggleEffect(_ effect: String) {
-        if selectedEffects.contains(effect) {
-            selectedEffects.removeAll { $0 == effect }
-        } else {
-            selectedEffects.append(effect)
-        }
-    }
+    func save(onComplete: ((UUID) -> Void)? = nil) async {
+        guard isValid else { return }
 
-    func save() async -> Bool {
         do {
-            print("💾 CreateMemory: Saving memory with \(selectedImages.count) images")
-            for (index, imageData) in selectedImages.enumerated() {
-                print("💾 CreateMemory: Image \(index + 1) size: \(imageData.count) bytes")
-            }
+            print("💾 CreateMemory (Simplified): Creating minimal bud '\(strainName)'")
 
+            // Create minimal receipt with defaults
             let memory = try await repository.create(
-                strainName: strainName,
+                strainName: strainName.trimmingCharacters(in: .whitespacesAndNewlines),
                 productType: productType,
-                rating: rating,
-                notes: notes.isEmpty ? nil : notes,
-                brand: brand.isEmpty ? nil : brand,
-                thcPercent: thcPercent,
-                cbdPercent: cbdPercent,
-                amountGrams: nil,
-                effects: selectedEffects,
-                consumptionMethod: consumptionMethod,
-                locationCID: nil,
+                rating: 0,              // Default: no rating yet
+                notes: nil,             // No notes
+                brand: nil,             // No brand
+                thcPercent: nil,        // No THC
+                cbdPercent: nil,        // No CBD
+                amountGrams: nil,       // No amount
+                effects: [],            // No effects
+                consumptionMethod: nil, // No method
+                locationCID: nil,       // No location
                 jarID: jarID
             )
 
-            print("💾 CreateMemory: Memory created with ID: \(memory.id)")
+            print("✅ Minimal bud created: \(memory.id)")
+            print("   Name: \(strainName)")
+            print("   Type: \(productType.displayName)")
+            print("   → Callback will navigate to enrich view")
 
-            // Add images if any were selected
-            if !selectedImages.isEmpty {
-                print("💾 CreateMemory: Adding \(selectedImages.count) images to memory")
-                try await repository.addImages(to: memory.id, images: selectedImages)
-                print("💾 CreateMemory: Images added successfully")
-            }
+            // Trigger callback to show enrich view
+            onComplete?(memory.id)
 
-            print("✅ Memory created successfully with \(selectedImages.count) images")
-            return true
+            // Refresh jar list (lightweight)
+            await JarManager.shared.refreshJar(jarID)
+
         } catch {
-            print("❌ Failed to create memory: \(error)")
+            print("❌ Failed to create minimal bud: \(error)")
             errorMessage = error.localizedDescription
             showError = true
-            return false
-        }
-    }
-}
-
-// MARK: - Effect Options
-
-enum EffectOption: String, CaseIterable {
-    case relaxed, creative, energized, happy, focused, sleepy, anxious, euphoric
-
-    var color: Color {
-        switch self {
-        case .relaxed: return .effectRelaxed
-        case .creative: return .effectCreative
-        case .energized: return .effectEnergized
-        case .happy: return .effectHappy
-        case .focused: return .effectFocused
-        case .sleepy: return .effectSleepy
-        case .anxious: return .effectAnxious
-        case .euphoric: return .budsWarning
-        }
-    }
-
-    static var all: [EffectOption] {
-        allCases
-    }
-}
-
-// MARK: - Flow Layout (for effect chips)
-
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(in: proposal.replacingUnspecifiedDimensions().width, subviews: subviews, spacing: spacing)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + result.frames[index].minX, y: bounds.minY + result.frames[index].minY), proposal: .unspecified)
-        }
-    }
-
-    struct FlowResult {
-        var frames: [CGRect] = []
-        var size: CGSize = .zero
-
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var currentX: CGFloat = 0
-            var currentY: CGFloat = 0
-            var lineHeight: CGFloat = 0
-
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-
-                if currentX + size.width > maxWidth, currentX > 0 {
-                    currentX = 0
-                    currentY += lineHeight + spacing
-                    lineHeight = 0
-                }
-
-                frames.append(CGRect(x: currentX, y: currentY, width: size.width, height: size.height))
-
-                lineHeight = max(lineHeight, size.height)
-                currentX += size.width + spacing
-            }
-
-            self.size = CGSize(width: maxWidth, height: currentY + lineHeight)
         }
     }
 }
 
 // MARK: - Product Type Extension
 
-extension ProductType: CaseIterable {
-    static var allCases: [ProductType] {
-        [.flower, .edible, .concentrate, .vape, .tincture, .topical, .other]
+extension ProductType {
+    var icon: String {
+        switch self {
+        case .flower: return "🌿"
+        case .edible: return "🍪"
+        case .concentrate: return "💎"
+        case .vape: return "💨"
+        case .tincture: return "💧"
+        case .topical: return "🧴"
+        case .other: return "📦"
+        }
     }
 }
 
-extension ConsumptionMethod: CaseIterable {
-    static var allCases: [ConsumptionMethod] {
-        [.joint, .bong, .pipe, .vape, .edible, .dab, .tincture, .topical]
+extension ProductType: CaseIterable {
+    static var allCases: [ProductType] {
+        [.flower, .edible, .concentrate, .vape, .tincture, .topical, .other]
     }
 }
 

@@ -1,6 +1,6 @@
 # Buds Design System v0.1
 
-Complete design system for Buds iOS app. Updated Dec 2024.
+Complete design system for Buds iOS app. Updated December 30, 2025 (Phase 10.1).
 
 ---
 
@@ -14,7 +14,7 @@ Complete design system for Buds iOS app. Updated Dec 2024.
 | `budsPurple` | #3D2645 | #5A3F6B | Secondary brand, accents |
 | `budsCream` | #FAF7F2 | #1A1A1A | Root backgrounds |
 | `budsSurface` | #FFFFFF | #252525 | Cards, elevated surfaces |
-| `budsTextPrimary` | #0F0F0F | #F5F5F5 | Primary text |
+| `budsTextPrimary` | #0F0F0F | #FFFFFF | Primary text (Updated: Dec 30 - was #F5F5F5) |
 | `budsTextSecondary` | #4A4A4A | #B0B0B0 | Secondary text |
 | `budsForest` | #52B788 | #40916C | Light green accents |
 | `budsLavender` | #8B7D9B | #9D8FB0 | Soft purple accents |
@@ -344,6 +344,47 @@ Button("Delete") { }
     .accessibilityLabel("Delete memory")
     .accessibilityHint("Removes this memory from your timeline")
 ```
+
+---
+
+## Phase 10.1 UI Optimizations (December 2025)
+
+### Reaction Components
+
+**Reaction Picker Buttons:**
+- **Size**: 44x44 pt (down from 54x54 pt for better fit in nested sheets)
+- **Emoji Size**: 26 pt (down from 32 pt)
+- **Spacing**: 10 pt between buttons (down from 12 pt)
+- **Total Width**: ~260 px (down from 318 px)
+
+```swift
+// ReactionPicker button
+Text(type.emoji)
+    .font(.system(size: 26))
+    .frame(width: 44, height: 44)
+    .background(isSelected ? Color.budsPrimary.opacity(0.3) : Color.budsSurface)
+    .cornerRadius(10)
+```
+
+**Reaction Summary Bubbles:**
+- **Emoji Size**: 18 pt (down from .title3)
+- **Count Font**: .caption2 (down from .budsCaption)
+- **Spacing**: 8 pt between bubbles (down from 12 pt)
+- **Padding**: 10 pt horizontal, 5 pt vertical
+
+```swift
+// Reaction summary bubble
+HStack(spacing: 3) {
+    Text(summary.emoji)
+        .font(.system(size: 18))
+    Text("\(summary.count)")
+        .font(.caption2)
+}
+.padding(.horizontal, 10)
+.padding(.vertical, 5)
+```
+
+**Rationale**: Original sizing caused layout overflow in nested NavigationStack + Sheet contexts. Reduced sizing by ~18-20% ensures proper fit across all iPhone sizes while maintaining tap target accessibility.
 
 ---
 

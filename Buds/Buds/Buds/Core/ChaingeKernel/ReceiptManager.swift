@@ -87,6 +87,74 @@ actor ReceiptManager {
         return (cid: cid, signature: signature)
     }
 
+    /// Create and sign a reaction receipt (Phase 10.1 Module 1.5)
+    /// Returns (cid, signature) for the created receipt
+    func createReactionReceipt(
+        type: String,
+        payload: ReactionAddedPayload,
+        parentCID: String? = nil
+    ) async throws -> (cid: String, signature: String) {
+
+        // Get identity info
+        let did = try await identity.getDID()
+        let deviceId = try await identity.getDeviceID()
+
+        // Determine rootCID
+        let rootCID: String
+        if let parentCID = parentCID {
+            rootCID = try fetchRootCID(for: parentCID)
+        } else {
+            rootCID = "SELF"  // Placeholder
+        }
+
+        // Build unsigned preimage
+        let preimage = try UnsignedReceiptPreimage.buildReactionAddedReceipt(
+            did: did,
+            deviceId: deviceId,
+            parentCID: parentCID,
+            rootCID: rootCID,
+            receiptType: type,
+            payload: payload
+        )
+
+        // Encode to canonical CBOR
+        let canonicalBytes = try ReceiptCanonicalizer.canonicalCBOR(preimage)
+
+        // Compute CID
+        let cid = try computeCID(from: canonicalBytes)
+
+        // If this is a new chain, update rootCID to point to self
+        let finalRootCID = rootCID == "SELF" ? cid : rootCID
+
+        // Sign the canonical bytes
+        let signatureData = try await identity.sign(data: canonicalBytes)
+        let signature = signatureData.base64EncodedString()
+
+        // Store in database
+        try db.write { db in
+            // Encode payload to JSON for querying
+            let payloadJSON = try String(data: JSONEncoder().encode(payload), encoding: .utf8) ?? "{}"
+
+            // Insert into ucr_headers
+            try db.execute(
+                sql: """
+                    INSERT INTO ucr_headers (
+                        cid, did, device_id, parent_cid, root_cid,
+                        receipt_type, signature, raw_cbor, payload_json, received_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    cid, did, deviceId, parentCID, finalRootCID,
+                    type, signature, canonicalBytes, payloadJSON, Date().timeIntervalSince1970
+                ]
+            )
+        }
+
+        print("✅ Created reaction receipt: \(cid)")
+
+        return (cid: cid, signature: signature)
+    }
+
     // MARK: - Verify Receipt
 
     /// Verify receipt signature

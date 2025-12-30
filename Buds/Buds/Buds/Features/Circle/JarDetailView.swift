@@ -14,9 +14,11 @@ struct JarDetailView: View {
     @State private var members: [JarMember] = []
     @State private var showingAddMember = false
     @State private var showingMemberDetail: JarMember?
-    @State private var selectedMemoryID: UUID?
+    @State private var selectedMemory: Memory?     // Phase 10.1 Module 1.1: For detail view
     @State private var isLoading = false
     @State private var showMembersSheet = false
+    @State private var showingCreateMemory = false  // Phase 10.1: Create flow
+    @State private var memoryToEnrich: UUID?       // Phase 10.1: Enrich flow
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -24,7 +26,7 @@ struct JarDetailView: View {
             Color.black.ignoresSafeArea()
 
             if isLoading {
-                ProgressView()
+                ProgressView("Loading buds...")
                     .tint(.budsPrimary)
             } else if memoryItems.isEmpty {
                 emptyMemoriesState
@@ -37,14 +39,19 @@ struct JarDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    NavigationLink(destination: CreateMemoryView(jarID: jar.id)) {
+                    Button {
+                        showingCreateMemory = true
+                    } label: {
                         Label("Add Bud", systemImage: "plus.circle")
                     }
 
-                    Button {
-                        showMembersSheet = true
-                    } label: {
-                        Label("Manage Members", systemImage: "person.2")
+                    // Only show Manage Members for shared jars (not solo)
+                    if jar.id != "solo" {
+                        Button {
+                            showMembersSheet = true
+                        } label: {
+                            Label("Manage Members", systemImage: "person.2")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -55,6 +62,38 @@ struct JarDetailView: View {
         .sheet(isPresented: $showMembersSheet) {
             NavigationStack {
                 membersView
+            }
+        }
+        // Phase 10.1: Create → Enrich flow
+        .sheet(isPresented: $showingCreateMemory, onDismiss: {
+            Task { await loadMemories() }
+        }) {
+            NavigationStack {
+                CreateMemoryView(jarID: jar.id) { createdMemoryID in
+                    // On save complete, show enrich view
+                    memoryToEnrich = createdMemoryID
+                }
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { memoryToEnrich != nil },
+            set: { if !$0 { memoryToEnrich = nil } }
+        ), onDismiss: {
+            Task { await loadMemories() }
+        }) {
+            if let memoryID = memoryToEnrich {
+                NavigationStack {
+                    EditMemoryView(memoryID: memoryID, isEnrichMode: true)
+                }
+            }
+        }
+        // Phase 10.1 Module 1.1: Memory detail view
+        .sheet(item: $selectedMemory, onDismiss: {
+            // Phase 10.1 Module 1.3: Reload list after detail view dismissal (in case of delete)
+            Task { await loadMemories() }
+        }) { memory in
+            NavigationStack {
+                MemoryDetailView(memory: memory)
             }
         }
         .task {
@@ -83,7 +122,9 @@ struct JarDetailView: View {
                     .padding(.horizontal, 40)
             }
 
-            NavigationLink(destination: CreateMemoryView(jarID: jar.id)) {
+            Button {
+                showingCreateMemory = true
+            } label: {
                 HStack {
                     Image(systemName: "plus.circle")
                     Text("Add Your First Bud")
@@ -106,9 +147,8 @@ struct JarDetailView: View {
             LazyVStack(spacing: 12) {
                 ForEach(memoryItems) { item in
                     MemoryListCard(item: item) {
-                        // TODO: Navigate to memory detail view when tapped
-                        // For now, just print
-                        print("Tapped memory: \(item.strainName)")
+                        // Phase 10.1 Module 1.1: Fetch full memory and show detail view
+                        await loadMemoryDetail(id: item.id)
                     }
                 }
             }
@@ -244,6 +284,19 @@ struct JarDetailView: View {
             print("✅ Loaded \(members.count) members for jar \(jar.name)")
         } catch {
             print("❌ Failed to load members: \(error)")
+        }
+    }
+
+    private func loadMemoryDetail(id: UUID) async {
+        do {
+            let repository = MemoryRepository()
+            let memory = try await repository.fetch(id: id)
+            print("✅ Loaded memory detail: \(memory!.strainName)")
+            await MainActor.run {
+                selectedMemory = memory
+            }
+        } catch {
+            print("❌ Failed to load memory detail: \(error)")
         }
     }
 }

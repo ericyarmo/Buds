@@ -20,10 +20,11 @@ struct Toast: Equatable {
     let style: Style
     let duration: TimeInterval
 
-    init(message: String, style: Style = .info, duration: TimeInterval = 2.0) {
+    init(message: String, style: Style = .info, duration: TimeInterval? = nil) {
         self.message = message
         self.style = style
-        self.duration = duration
+        // Error toasts stay longer (5s), others shorter (2s)
+        self.duration = duration ?? (style == .error ? 5.0 : 2.0)
     }
 }
 
@@ -68,8 +69,8 @@ struct ToastView: View {
 
     private var backgroundColor: Color {
         switch toast.style {
-        case .success: return Color.budsSuccess.opacity(0.2)
-        case .error: return Color.budsDanger.opacity(0.2)
+        case .success: return Color.budsSuccess.opacity(0.9)
+        case .error: return Color.budsDanger.opacity(0.9)
         case .info: return Color.budsPrimary.opacity(0.2)
         }
     }
@@ -86,7 +87,14 @@ struct ToastModifier: ViewModifier {
                 if let toast = toast {
                     ToastView(toast: toast)
                         .transition(.move(edge: .top).combined(with: .opacity))
+                        .onTapGesture {
+                            // Tap to dismiss
+                            withAnimation {
+                                self.toast = nil
+                            }
+                        }
                         .onAppear {
+                            // Auto-dismiss after duration
                             DispatchQueue.main.asyncAfter(deadline: .now() + toast.duration) {
                                 withAnimation {
                                     self.toast = nil

@@ -54,6 +54,8 @@ enum ReceiptType {
     static let profileCreated = "app.buds.profile.created/v1"
     static let inviteCreated = "app.buds.circle.invite.created/v1"
     static let inviteAccepted = "app.buds.circle.invite.accepted/v1"
+    static let reactionAdded = "app.buds.reaction.added/v1"       // Phase 10.1 Module 1.5
+    static let reactionRemoved = "app.buds.reaction.removed/v1"   // Phase 10.1 Module 1.5
 }
 
 // MARK: - Session Payload
@@ -141,5 +143,31 @@ struct InviteAcceptedPayload: Codable {
         case inviteCode = "invite_code"
         case inviterDID = "inviter_did"
         case acceptedAtMs = "accepted_at_ms"
+    }
+}
+
+// MARK: - Reaction Payloads (Phase 10.1 Module 1.5)
+
+/// Payload for app.buds.reaction.added/v1
+struct ReactionAddedPayload: Codable {
+    let memoryID: String                 // UUID of the memory being reacted to
+    let reactionType: String             // heart, laughing, fire, eyes, chilled
+    let createdAtMs: Int64              // Claimed time (UNVERIFIED)
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case reactionType = "reaction_type"
+        case createdAtMs = "created_at_ms"
+    }
+}
+
+/// Payload for app.buds.reaction.removed/v1
+struct ReactionRemovedPayload: Codable {
+    let memoryID: String                 // UUID of the memory
+    let reactionType: String             // Which reaction was removed
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case reactionType = "reaction_type"
     }
 }

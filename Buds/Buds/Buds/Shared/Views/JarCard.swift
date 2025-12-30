@@ -15,13 +15,8 @@ struct JarCard: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            // Icon
-            Image(systemName: jar.isSolo ? "person.fill" : "person.2.fill")
-                .font(.title2)
-                .foregroundColor(.budsPrimary)
-                .frame(width: 50, height: 50)
-                .background(Color.budsPrimary.opacity(0.2))
-                .clipShape(Circle())
+            // Mason jar icon (Phase 10.1 Module 2)
+            jarIcon
 
             // Info
             VStack(alignment: .leading, spacing: 4) {
@@ -48,6 +43,47 @@ struct JarCard: View {
         .task {
             await loadCounts()
         }
+    }
+
+    // MARK: - Jar Icon (Phase 10.1 Module 2)
+
+    private var jarIcon: some View {
+        ZStack {
+            // Mason jar body
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.budsPrimary.opacity(0.15))
+                .frame(width: 50, height: 50)
+
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.budsPrimary, lineWidth: 2)
+                .frame(width: 50, height: 50)
+
+            // Lid (horizontal line at top)
+            Rectangle()
+                .fill(Color.budsPrimary)
+                .frame(width: 40, height: 3)
+                .offset(y: -18)
+
+            // Buds inside (leaf icon)
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 20))
+                .foregroundColor(.budsPrimary.opacity(0.6))
+                .offset(y: 4)
+
+            // Solo vs Shared indicator (small badge)
+            if !jar.isSolo {
+                Circle()
+                    .fill(Color.budsSuccess)
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(.white)
+                    )
+                    .offset(x: 18, y: -18)
+            }
+        }
+        .frame(width: 50, height: 50)
     }
 
     private func loadCounts() async {

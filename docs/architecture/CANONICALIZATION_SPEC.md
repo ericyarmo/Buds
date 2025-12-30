@@ -1,6 +1,6 @@
 # Buds Receipt Canonicalization Specification
 
-**Last Updated:** December 16, 2025
+**Last Updated:** December 30, 2025
 **Version:** v0.1
 **Critical:** This spec defines the exact bytes that are signed and hashed. Do not deviate.
 
@@ -71,6 +71,8 @@ The `receiptType` field uses versioned string identifiers (e.g., `app.buds.sessi
 - `app.buds.session.created/v1` - New session
 - `app.buds.session.updated/v1` - Edit to existing session
 - `app.buds.memory.shared/v1` - Share to Circle
+- `app.buds.memory.reaction.created/v1` - Add reaction to memory (Phase 10.1)
+- `app.buds.memory.reaction.removed/v1` - Remove reaction from memory (Phase 10.1)
 - `app.buds.circle.invite.accepted/v1` - Accept Circle invite
 
 **Note:** This spec focuses on the canonical encoding mechanism. Refer to RECEIPT_SCHEMAS.md for payload field definitions and validation rules.
