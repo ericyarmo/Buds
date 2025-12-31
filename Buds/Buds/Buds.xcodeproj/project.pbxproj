@@ -121,6 +121,7 @@
 		5893A3D92F028197001F310F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5893A3DF2F032036001F310F /* StressTestGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTestGenerator.swift; sourceTree = "<group>"; };
 		5893A3E02F032036001F310F /* StressTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTestView.swift; sourceTree = "<group>"; };
+		5893A3ED2F04C870001F310F /* Buds.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Buds.xctestplan; sourceTree = "<group>"; };
 		58FFD8C92EF28ECE00C0A7DB /* Buds.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Buds.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8D62EF28ED100C0A7DB /* BudsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8E02EF28ED100C0A7DB /* BudsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -260,6 +261,7 @@
 		58FFD8C02EF28ECE00C0A7DB = {
 			isa = PBXGroup;
 			children = (
+				5893A3ED2F04C870001F310F /* Buds.xctestplan */,
 				58FFD94A2EF2900D00C0A7DB /* Buds */,
 				58FFD8D92EF28ED100C0A7DB /* BudsTests */,
 				58FFD8E32EF28ED100C0A7DB /* BudsUITests */,

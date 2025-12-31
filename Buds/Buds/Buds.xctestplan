@@ -1,0 +1,44 @@
+{
+  "configurations" : [
+    {
+      "id" : "4712F2A2-07EE-4C83-8CF6-9AEDAD70F73C",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Buds.xcodeproj",
+      "identifier" : "58FFD8C82EF28ECE00C0A7DB",
+      "name" : "Buds"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "skippedTests" : [
+        "BudsTests",
+        "BudsTests\/testExample()",
+        "BudsTests\/testPerformanceExample()"
+      ],
+      "target" : {
+        "containerPath" : "container:Buds.xcodeproj",
+        "identifier" : "58FFD8D52EF28ED100C0A7DB",
+        "name" : "BudsTests"
+      }
+    },
+    {
+      "enabled" : false,
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Buds.xcodeproj",
+        "identifier" : "58FFD8DF2EF28ED100C0A7DB",
+        "name" : "BudsUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
