@@ -8,14 +8,15 @@ Built on receipt-first, local-first, privacy-by-default principles.
 
 ## Project Status
 
-**Current Build:** ✅ Phases 1-10 Complete | 🚧 Phase 10.1 In Progress (Beta Readiness)
-**Date:** December 29, 2025
+**Current Build:** ✅ Phases 1-10.2 Complete | Ready for TestFlight 🚀
+**Date:** December 30, 2025
 **Version:** 1.0.0 (Beta)
 **Bundle ID:** `app.getbuds.buds`
 
-**Latest Milestone:** Phase 10.1 Modules 1-5 Complete ✅
-**Next Up:** Module 6 - TestFlight Prep
-**Goal:** TestFlight beta with 20-50 real users → Gather feedback → App Store
+**Latest Milestone:** Phase 10.2 Complete - Sharing Fixed ✅
+**Status:** Ready for TestFlight upload
+**Next Up:** Archive → App Store Connect → Beta testing (20-50 users)
+**Goal:** Gather feedback from real users → Iterate → App Store launch
 
 ---
 
@@ -291,6 +292,12 @@ Legend:
 - Toast notifications
 - Haptic feedback
 
+### ✅ E2EE Sharing (Phase 10.2)
+- **Send buds**: Share encrypted buds to jar members
+- **Real-time receive**: 30s polling interval, buds appear automatically
+- **UI updates**: Jar stats and memory lists refresh on new arrivals
+- **Known limitation**: Multi-jar members may receive buds in wrong jar (can move manually)
+
 ### ✅ Design System
 - BudsColors, BudsTypography, BudsSpacing
 - Dark mode throughout
@@ -298,7 +305,7 @@ Legend:
 
 ---
 
-## What's In Progress (Phase 10.1)
+## What Was Built (Phase 10.1 - COMPLETE)
 
 ### ✅ Module 1.0: Simplified Create Flow (COMPLETE)
 - Reduced create form to 2 fields (name + type)
@@ -341,12 +348,13 @@ Legend:
 - UI components: ReactionPicker + ReactionSummaryView
 - Note: Local-only, uses placeholder phone (multi-user sync deferred)
 
-### 🔜 Module 1.5: Multi-User Reactions Sync (DEFERRED)
+### ⚠️ Module 1.5: Multi-User Reactions Sync (DEFERRED)
 - Receipt-based reactions for E2EE shared jars
 - Get real user phone from AuthManager
 - Sync via relay (same pattern as memories)
 - Display combined reactions from all jar members
-- Deferred: Can ship beta without this, add after feedback
+- **Status**: Deferred until sharing is fully working
+- **Blocker**: Need to fix foreground polling first
 
 ### ✅ Module 2: Jar System Polish (COMPLETE)
 - Custom mason jar icon with lid + leaf inside
@@ -374,6 +382,14 @@ Legend:
 - **5.3 Multi-Device**: Testing across iPhone SE, 15, Pro Max
 - Stress test generator accessible from Profile → Debug section
 
+### 🔜 Module 6: TestFlight Prep (BLOCKED)
+**Blocker:** Must fix foreground polling bug first
+- Archive build
+- Upload to App Store Connect
+- TestFlight beta metadata
+- Internal testing
+- External beta release
+
 ---
 
 ## Phase History (Summary)
@@ -385,7 +401,8 @@ Legend:
 | **9a** | ✅ Complete | Jar Management (CRUD, member management, roles) |
 | **9b** | ✅ Complete | Shelf View (grid layout, replaced Timeline) |
 | **10** | ✅ Complete | Production Hardening (E2EE verified, memory optimized, toast, haptics) |
-| **10.1** | 🚧 In Progress | Beta Readiness (simplified UX, reactions, polish) - **Modules 1-5 done** |
+| **10.1** | ✅ Complete | Beta Readiness (simplified UX, reactions, polish) - **All modules done** |
+| **10.2** | ✅ Complete | Sharing Fix (foreground polling, real-time inbox) - **READY FOR BETA** |
 | **11-14** | 🔜 Planned | Map, Shop, AI, App Store Prep (deferred until after beta feedback) |
 
 **See [`R1_MASTER_PLAN_UPDATED.md`](./docs/planning/R1_MASTER_PLAN_UPDATED.md) for complete phase details.**
@@ -476,13 +493,17 @@ Cmd+R
 
 **Current Milestone:** TestFlight beta with 20-50 real users (2 weeks)
 
-**Next Steps:**
-1. ✅ Module 1.0: Simplified Create (DONE)
-2. 🔜 Module 1.1: Memory Detail View
-3. 🔜 Module 1.2: Edit Memory (Enrich)
-4. 🔜 Module 1.3: Delete Memory
-5. 🔜 Module 1.4: Reactions System
-6. 🔜 Modules 2-6: Polish + TestFlight upload
+**Completed in Phase 10.1:**
+1. ✅ Module 1.0-1.4: Create, Detail, Edit, Delete, Reactions
+2. ✅ Module 2: Jar System Polish
+3. ✅ Module 3: User Guidance (Onboarding + Profile)
+4. ✅ Module 4: Error Handling & Feedback
+5. ✅ Module 5: Performance & Testing
+
+**Phase 10.2 Complete:**
+- ✅ Fixed foreground polling (MainTabView)
+- ✅ Real-time UI refresh (JarDetailView + ShelfView)
+- ✅ Sharing now works end-to-end
 
 **Post-Beta:**
 - Phase 11: Map View
@@ -502,11 +523,13 @@ Private project. Architecture by Claude (Anthropic) + Eric.
 
 ## Build Progress Tracker
 
-**Last Updated:** December 28, 2025
-**Current Phase:** Phase 10.1 (Beta Readiness)
-**Latest Commit:** Module 2 - Jar System Polish ✅
+**Last Updated:** December 30, 2025
+**Current Phase:** Phase 10.2 Complete ✅ | TestFlight Ready 🚀
+**Latest Commit:** Phase 10.2 - Sharing Fix (foreground polling + UI refresh)
 
-**Next Session:** User Guidance (Module 3)
+**Status:** All critical features working, ready for beta testing
+**Known Limitation:** Multi-jar members may receive buds in wrong jar (manual move available)
+**Next Session:** Archive build → TestFlight upload → Beta testing
 
 ---
 

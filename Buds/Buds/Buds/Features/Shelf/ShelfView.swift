@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 // Identifiable wrapper for jar ID to avoid @State timing issues with sheets
 struct JarSelection: Identifiable {
@@ -129,6 +130,13 @@ struct ShelfView: View {
             }
             .task {
                 await jarManager.loadJars()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .inboxUpdated)) { _ in
+                // Phase 10.2: Refresh jar stats when new shared buds arrive
+                Task {
+                    await jarManager.refreshGlobal()
+                    print("📬 [ShelfView] Refreshed jars after inbox update")
+                }
             }
             .alert("Delete \(jarToDelete?.name ?? "Jar")?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {

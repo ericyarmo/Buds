@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct JarDetailView: View {
     let jar: Jar
@@ -99,6 +100,13 @@ struct JarDetailView: View {
         .task {
             await loadMemories()
             await loadMembers()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .inboxUpdated)) { _ in
+            // Phase 10.2: Reload memories when new shared buds arrive
+            Task {
+                await loadMemories()
+                print("📬 [JarDetailView] Reloaded memories after inbox update")
+            }
         }
     }
 
