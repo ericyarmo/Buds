@@ -5,9 +5,12 @@
 //  Manages cryptographic identity (Ed25519 + X25519 keypairs)
 //  Stores keys securely in iOS Keychain
 //
+//  Phase 10.3 Module 0.2: Phone-based DID derivation
+//
 
 import Foundation
 import CryptoKit
+import FirebaseAuth
 
 actor IdentityManager {
     static let shared = IdentityManager()
@@ -56,16 +59,56 @@ actor IdentityManager {
         return keypair
     }
 
-    // MARK: - DID Generation
+    // MARK: - DID Generation (Phase 10.3 Module 0.2)
 
-    /// Generate DID from Ed25519 public key
-    /// Format: did:buds:<base58(first_20_bytes_of_ed25519_pubkey)>
-    func getDID() throws -> String {
-        let signingKey = try getSigningKeypair()
-        let pubkeyBytes = signingKey.publicKey.rawRepresentation
-        let first20 = pubkeyBytes.prefix(20)
-        let base58 = Base58.encode(Data(first20))
-        return "did:buds:\(base58)"
+    /// Generate DID from phone number + account salt
+    /// Format: did:phone:SHA256(phone + salt)
+    ///
+    /// This enables multi-device identity:
+    /// - All devices with same phone → same DID
+    /// - Each device has own signing/encryption keys
+    /// - Salt prevents DID → phone reversal
+    func getDID() async throws -> String {
+        // Get phone from Firebase Auth
+        guard let phone = Auth.auth().currentUser?.phoneNumber else {
+            throw IdentityError.phoneNotAvailable
+        }
+
+        // Get or create account salt (cached locally)
+        let salt = try await getAccountSalt()
+
+        // Derive DID: did:phone:SHA256(phone + salt)
+        return deriveDID(phoneNumber: phone, accountSalt: salt)
+    }
+
+    /// Derive DID from phone + salt
+    private func deriveDID(phoneNumber: String, accountSalt: String) -> String {
+        let combined = phoneNumber + accountSalt
+        guard let data = combined.data(using: .utf8) else {
+            fatalError("Failed to encode phone + salt")
+        }
+
+        let hash = SHA256.hash(data: data)
+        let hashHex = hash.map { String(format: "%02x", $0) }.joined()
+        return "did:phone:\(hashHex)"
+    }
+
+    /// Get account salt (cached in keychain)
+    /// Fetches from relay on first call, caches locally for subsequent calls
+    private func getAccountSalt() async throws -> String {
+        // Check keychain cache first
+        if let cached = try loadStringFromKeychain(key: "account_salt") {
+            return cached
+        }
+
+        // Fetch from relay
+        let salt = try await RelayClient.shared.getOrCreateAccountSalt()
+
+        // Cache in keychain
+        try saveStringToKeychain(key: "account_salt", value: salt)
+        print("✅ Cached account salt in keychain")
+
+        return salt
     }
 
     // MARK: - Device ID
@@ -91,10 +134,10 @@ actor IdentityManager {
 
     // MARK: - DID Property (Convenience)
 
-    /// Current DID property (for compatibility with Phase 6)
+    /// Current DID property (async - Phase 10.3 Module 0.2)
     var currentDID: String {
-        get throws {
-            try getDID()
+        get async throws {
+            try await getDID()
         }
     }
 
@@ -185,6 +228,7 @@ enum IdentityError: Error, LocalizedError {
     case keychainLoadFailed(OSStatus)
     case invalidPublicKey
     case signatureFailed
+    case phoneNotAvailable  // Phase 10.3 Module 0.2
 
     var errorDescription: String? {
         switch self {
@@ -196,6 +240,8 @@ enum IdentityError: Error, LocalizedError {
             return "Invalid public key format"
         case .signatureFailed:
             return "Signature generation failed"
+        case .phoneNotAvailable:
+            return "Phone number not available (user not authenticated)"
         }
     }
 }

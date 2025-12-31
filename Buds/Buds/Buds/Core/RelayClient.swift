@@ -84,6 +84,46 @@ class RelayClient {
         return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
 
+    // MARK: - Account Salt (Phase 10.3 Module 0.2)
+
+    /// Get or create account salt for phone-based DID derivation
+    /// DID = did:phone:SHA256(phone + salt)
+    func getOrCreateAccountSalt() async throws -> String {
+        let headers = try await authHeader()
+        let url = URL(string: "\(baseURL)/api/account/salt")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+
+        // No body needed - endpoint uses authenticated user's phone
+
+        let (data, res) = try await URLSession.shared.data(for: req)
+        let statusCode = (res as? HTTPURLResponse)?.statusCode ?? 0
+
+        guard statusCode == 200 else {
+            if let errorBody = String(data: data, encoding: .utf8) {
+                print("❌ Account salt request failed (HTTP \(statusCode)): \(errorBody)")
+            }
+            throw RelayError.serverError
+        }
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let salt = json?["salt"] as? String else {
+            print("❌ Failed to extract salt from response")
+            throw RelayError.invalidResponse
+        }
+
+        let wasCreated = (json?["created"] as? Bool) ?? false
+        if wasCreated {
+            print("✅ Generated new account salt")
+        } else {
+            print("✅ Retrieved existing account salt")
+        }
+
+        return salt
+    }
+
     // MARK: - DID Lookup
 
     func lookupDID(phoneNumber: String) async throws -> String {
