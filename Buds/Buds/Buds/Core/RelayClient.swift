@@ -11,6 +11,7 @@ import CryptoKit
 
 class RelayClient {
     static let shared = RelayClient()
+    // Phase 10.3 Module 0.3: Production relay with deterministic phone encryption
     private let baseURL = "https://buds-relay.getstreams.workers.dev"
 
     private init() {}
@@ -37,14 +38,14 @@ class RelayClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
 
-        // Hash the phone number (SHA-256)
-        let phoneHash = try hashPhoneNumber(phoneNumber)
-
+        // Phase 10.3 Module 0.3: Send plaintext phone number
+        // Server will encrypt it server-side for storage
+        // Security: Phone sent over HTTPS (TLS), encrypted at rest in DB
         var body: [String: Any] = [
             "device_id": deviceId,
             "device_name": deviceName,
             "owner_did": ownerDID,
-            "owner_phone_hash": phoneHash,
+            "phone_number": phoneNumber,  // Changed from owner_phone_hash to phone_number
             "pubkey_x25519": pubkeyX25519,
             "pubkey_ed25519": pubkeyEd25519
         ]
@@ -134,10 +135,10 @@ class RelayClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
 
-        // Hash phone number
-        let phoneHash = try hashPhoneNumber(phoneNumber)
-        print("[DEBUG] Looking up DID for phone hash: \(phoneHash)")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["phone_hash": phoneHash])
+        // Phase 10.3 Module 0.3: Send plaintext phone number
+        // Server will encrypt it server-side for deterministic lookup
+        print("[DEBUG] Looking up DID for phone number: \(phoneNumber)")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["phone_number": phoneNumber])
 
         let (data, res) = try await URLSession.shared.data(for: req)
         let statusCode = (res as? HTTPURLResponse)?.statusCode ?? 0
