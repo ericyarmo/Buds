@@ -606,12 +606,34 @@ struct SessionPayload: Codable {
 - `Features/Circle/MemberDetailView.swift` - Add "Verify" button
 
 **Tasks:**
-1. Generate safety number:
+1. Generate safety number (FIXED: canonical ordering for determinism):
    ```swift
    func generateSafetyNumber(myDID: String, theirDID: String, theirDevices: [Device]) -> String {
-       let combined = myDID + theirDID + theirDevices.map { $0.pubkeyEd25519 }.joined()
+       // CRITICAL: Canonical DID ordering (both parties must compute same hash)
+       let orderedDIDs = [myDID, theirDID].sorted().joined()
+
+       // CRITICAL: Deterministic device ordering (prevents array order mismatch)
+       let sortedDevices = theirDevices.sorted { $0.deviceId < $1.deviceId }
+       let deviceKeys = sortedDevices.map { $0.pubkeyEd25519 }.joined()
+
+       // Compute hash
+       let combined = orderedDIDs + deviceKeys
        let hash = SHA256.hash(data: combined.data(using: .utf8)!)
-       return formatAsGroups(hash.prefix(30))  // "12345 67890 12345..."
+
+       // Format as groups: "12345 67890 12345 67890 12345 67890"
+       return formatAsGroups(hash.prefix(30))
+   }
+
+   private func formatAsGroups(_ hash: Data.SubSequence) -> String {
+       let hexString = hash.map { String(format: "%02x", $0) }.joined()
+       // Group into 5-digit chunks for readability
+       return stride(from: 0, to: hexString.count, by: 5)
+           .map { i -> String in
+               let start = hexString.index(hexString.startIndex, offsetBy: i)
+               let end = hexString.index(start, offsetBy: min(5, hexString.count - i))
+               return String(hexString[start..<end])
+           }
+           .joined(separator: " ")
    }
    ```
 
@@ -627,13 +649,20 @@ struct SessionPayload: Codable {
        .onTapGesture {
            showingSafetyNumberSheet = true
        }
+
+       // Show device count for context
+       Text("Based on \(viewModel.deviceCount) device(s)")
+           .font(.caption2)
+           .foregroundColor(.secondary)
    }
    ```
 
 3. SafetyNumberView sheet:
-   - Show full safety number
-   - QR code (optional)
-   - Instructions: "Compare with friend's device"
+   - Show full safety number (large, monospaced font)
+   - Device count: "Based on 2 devices"
+   - Instructions: "Compare this number with your friend's device. If they match, your connection is secure."
+   - QR code (optional, defer to polish)
+   - Note: "This number will change if your friend adds a new device"
 
 **Success criteria:**
 - Safety number generated correctly

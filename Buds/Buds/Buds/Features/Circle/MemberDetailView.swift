@@ -17,6 +17,11 @@ struct MemberDetailView: View {
     @State private var showingRemoveConfirmation = false
     @State private var isRemoving = false
 
+    // Phase 10.3 Module 0.5: Safety Number
+    @State private var safetyNumber: String = "Loading..."
+    @State private var deviceCount: Int = 0
+    @State private var showingSafetyNumberSheet = false
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -50,6 +55,45 @@ struct MemberDetailView: View {
                     }
                     .font(.budsCaption)
                 }
+
+                // Phase 10.3 Module 0.5: Security Section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Security")
+                        .font(.budsBodyBold)
+                        .foregroundColor(.white)
+
+                    Button {
+                        showingSafetyNumberSheet = true
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Safety Number")
+                                    .font(.budsBody)
+                                    .foregroundColor(.white)
+
+                                Text(safetyNumber)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.budsPrimary)
+                                    .lineLimit(1)
+
+                                Text("Based on \(deviceCount) device\(deviceCount == 1 ? "" : "s")")
+                                    .font(.caption2)
+                                    .foregroundColor(.budsTextSecondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.budsTextSecondary)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.budsPrimary.opacity(0.1))
+                        )
+                    }
+                }
+                .padding(.horizontal)
 
                 Spacer()
 
@@ -87,6 +131,17 @@ struct MemberDetailView: View {
         } message: {
             Text("They will no longer have access to buds in \(jar.name).")
         }
+        // Phase 10.3 Module 0.5: Safety Number Sheet
+        .sheet(isPresented: $showingSafetyNumberSheet) {
+            SafetyNumberView(
+                member: member,
+                safetyNumber: safetyNumber,
+                deviceCount: deviceCount
+            )
+        }
+        .task {
+            await loadSafetyNumber()
+        }
     }
 
     private func removeMember() async {
@@ -98,6 +153,20 @@ struct MemberDetailView: View {
         } catch {
             print("❌ Failed to remove member: \(error)")
             isRemoving = false
+        }
+    }
+
+    // Phase 10.3 Module 0.5: Load safety number
+    private func loadSafetyNumber() async {
+        do {
+            let result = try await jarManager.generateSafetyNumber(memberDID: member.memberDID)
+            safetyNumber = result.safetyNumber
+            deviceCount = result.deviceCount
+            print("✅ Safety number generated for \(member.displayName): \(safetyNumber)")
+        } catch {
+            print("❌ Failed to generate safety number: \(error)")
+            safetyNumber = "Error loading"
+            deviceCount = 0
         }
     }
 }

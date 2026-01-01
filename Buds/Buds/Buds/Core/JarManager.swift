@@ -8,6 +8,7 @@
 import Foundation
 import GRDB
 import Combine
+import CryptoKit  // Phase 10.3 Module 0.5: For safety number generation
 
 @MainActor
 class JarManager: ObservableObject {
@@ -253,6 +254,63 @@ class JarManager: ObservableObject {
 
         print("🔐 TOFU: Using device-specific pinned Ed25519 key for \(deviceId)")
         return pubkeyData
+    }
+
+    // MARK: - Safety Number (Phase 10.3 Module 0.5)
+
+    /// Generate safety number for TOFU verification
+    /// Both parties compute the same hash for comparison
+    func generateSafetyNumber(memberDID: String) async throws -> (safetyNumber: String, deviceCount: Int) {
+        let myDID = try await IdentityManager.shared.currentDID
+
+        // Get all devices for this member
+        let devices = try await Database.shared.readAsync { db in
+            try Device
+                .filter(Device.Columns.ownerDID == memberDID)
+                .filter(Device.Columns.status == "active")
+                .fetchAll(db)
+        }
+
+        guard !devices.isEmpty else {
+            throw JarError.userNotRegistered
+        }
+
+        // CRITICAL: Canonical DID ordering (both parties must compute same hash)
+        let orderedDIDs = [myDID, memberDID].sorted().joined()
+
+        // CRITICAL: Deterministic device ordering (prevents array order mismatch)
+        let sortedDevices = devices.sorted { $0.deviceId < $1.deviceId }
+        let deviceKeys = sortedDevices.map { $0.pubkeyEd25519 }.joined()
+
+        // Compute hash
+        let combined = orderedDIDs + deviceKeys
+        guard let combinedData = combined.data(using: .utf8) else {
+            throw JarError.invalidPhoneNumber
+        }
+
+        let hash = CryptoKit.SHA256.hash(data: combinedData)
+
+        // Convert hash to Data, then take first 30 bytes (240 bits)
+        let hashData = Data(hash)
+        let truncatedHash = hashData.prefix(30)
+
+        // Format as groups: "12345 67890 12345 67890 12345 67890"
+        let safetyNumber = formatAsGroups(truncatedHash)
+
+        return (safetyNumber, devices.count)
+    }
+
+    private func formatAsGroups(_ hashBytes: Data) -> String {
+        let hexString = hashBytes.map { String(format: "%02x", $0) }.joined()
+
+        // Group into 5-digit chunks for readability
+        return stride(from: 0, to: hexString.count, by: 5)
+            .map { i -> String in
+                let start = hexString.index(hexString.startIndex, offsetBy: i)
+                let end = hexString.index(start, offsetBy: min(5, hexString.count - i))
+                return String(hexString[start..<end])
+            }
+            .joined(separator: " ")
     }
 }
 

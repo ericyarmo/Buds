@@ -31,6 +31,7 @@
 		5893A3DB2F028197001F310F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3D92F028197001F310F /* OnboardingView.swift */; };
 		5893A3E12F032036001F310F /* StressTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3E02F032036001F310F /* StressTestView.swift */; };
 		5893A3E22F032036001F310F /* StressTestGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3DF2F032036001F310F /* StressTestGenerator.swift */; };
+		5893A3EF2F0625B0001F310F /* SafetyNumberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3EE2F0625B0001F310F /* SafetyNumberView.swift */; };
 		58FFD94B2EF2900D00C0A7DB /* Info-Template.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD93F2EF2900D00C0A7DB /* Info-Template.plist */; };
 		58FFD94C2EF2900D00C0A7DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD9492EF2900D00C0A7DB /* Assets.xcassets */; };
 		58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9282EF2900D00C0A7DB /* BudsApp.swift */; };
@@ -122,6 +123,7 @@
 		5893A3DF2F032036001F310F /* StressTestGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTestGenerator.swift; sourceTree = "<group>"; };
 		5893A3E02F032036001F310F /* StressTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTestView.swift; sourceTree = "<group>"; };
 		5893A3ED2F04C870001F310F /* Buds.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Buds.xctestplan; sourceTree = "<group>"; };
+		5893A3EE2F0625B0001F310F /* SafetyNumberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafetyNumberView.swift; sourceTree = "<group>"; };
 		58FFD8C92EF28ECE00C0A7DB /* Buds.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Buds.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8D62EF28ED100C0A7DB /* BudsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8E02EF28ED100C0A7DB /* BudsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -467,6 +469,7 @@
 		58FFD99B2EF71C2900C0A7DB /* Circle */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3EE2F0625B0001F310F /* SafetyNumberView.swift */,
 				5893A3C22F01CE97001F310F /* MemoryListCard.swift */,
 				5893A3A52EFE813E001F310F /* CreateJarView.swift */,
 				5893A3A62EFE813E001F310F /* JarDetailView.swift */,
@@ -669,6 +672,7 @@
 				5893A3CE2F021E9E001F310F /* EditMemoryViewModel.swift in Sources */,
 				5893A3A72EFE813E001F310F /* JarDetailView.swift in Sources */,
 				5893A3B32F01A84A001F310F /* E2EETestView.swift in Sources */,
+				5893A3EF2F0625B0001F310F /* SafetyNumberView.swift in Sources */,
 				5893A3A82EFE813E001F310F /* CreateJarView.swift in Sources */,
 				58FFD9A62EFA2E2B00C0A7DB /* E2EEManager.swift in Sources */,
 				58FFD9572EF2900D00C0A7DB /* UCRHeader.swift in Sources */,

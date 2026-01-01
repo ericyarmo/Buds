@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import CryptoKit
+import GRDB  // Phase 10.3 Module 0.4: For device insertion
 
 actor InboxManager {
     static let shared = InboxManager()
@@ -166,11 +167,46 @@ actor InboxManager {
 
         // Step 1: Get device-specific pinned key (TOFU key pinning)
         print("🔐 [INBOX] Looking up device-specific pinned Ed25519 key...")
-        guard let pinnedPubkeyData = try await JarManager.shared.getPinnedEd25519PublicKey(
+        var pinnedPubkeyData = try await JarManager.shared.getPinnedEd25519PublicKey(
             did: message.senderDID,
             deviceId: message.senderDeviceId
-        ) else {
-            print("❌ [INBOX] Sender device not pinned: \(message.senderDeviceId) (DID: \(message.senderDID))")
+        )
+
+        // Phase 10.3 Module 0.4: Dynamic Device Discovery
+        if pinnedPubkeyData == nil {
+            print("⚠️  [INBOX] Device \(message.senderDeviceId) not found locally - fetching from relay...")
+
+            // Fetch device from relay
+            let devices = try await DeviceManager.shared.getDevices(for: [message.senderDID])
+            guard let newDevice = devices.first(where: { $0.deviceId == message.senderDeviceId }) else {
+                print("❌ [INBOX] Device \(message.senderDeviceId) not found on relay")
+                throw InboxError.senderDeviceNotFound
+            }
+
+            // Pin new device (updated TOFU)
+            try await Database.shared.writeAsync { db in
+                try newDevice.insert(db)
+            }
+
+            print("✅ [INBOX] New device pinned: \(newDevice.deviceId)")
+
+            // Get pinned key from newly inserted device
+            guard let pubkeyData = Data(base64Encoded: newDevice.pubkeyEd25519) else {
+                throw InboxError.invalidPublicKey
+            }
+            pinnedPubkeyData = pubkeyData
+
+            // Notify user of new device (toast warning)
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: .newDeviceDetected,
+                    object: nil,
+                    userInfo: ["did": message.senderDID, "deviceId": message.senderDeviceId]
+                )
+            }
+        }
+
+        guard let pubkeyData = pinnedPubkeyData else {
             throw InboxError.senderDeviceNotPinned
         }
         print("✅ [INBOX] Found device-specific TOFU-pinned Ed25519 key")
@@ -191,7 +227,7 @@ actor InboxManager {
 
         // Step 4: Verify Ed25519 signature over CBOR
         print("🔐 [INBOX] Verifying Ed25519 signature...")
-        let senderPublicKey = try Curve25519.Signing.PublicKey(rawRepresentation: pinnedPubkeyData)
+        let senderPublicKey = try Curve25519.Signing.PublicKey(rawRepresentation: pubkeyData)
 
         let isValid = try await ReceiptManager.shared.verifyReceipt(
             cborData: rawCBOR,
@@ -212,6 +248,7 @@ actor InboxManager {
 // Notification for UI updates
 extension Notification.Name {
     static let inboxUpdated = Notification.Name("inboxUpdated")
+    static let newDeviceDetected = Notification.Name("newDeviceDetected")  // Phase 10.3 Module 0.4
 }
 
 // MARK: - Errors
@@ -219,6 +256,8 @@ extension Notification.Name {
 enum InboxError: Error, LocalizedError {
     case senderNotInCircle
     case senderDeviceNotPinned
+    case senderDeviceNotFound        // Phase 10.3 Module 0.4
+    case invalidPublicKey            // Phase 10.3 Module 0.4
     case cidMismatch
     case signatureVerificationFailed
 
@@ -228,6 +267,10 @@ enum InboxError: Error, LocalizedError {
             return "Sender not in your Circle"
         case .senderDeviceNotPinned:
             return "Sender device not found or not pinned in Circle"
+        case .senderDeviceNotFound:
+            return "Sender device not found on relay"
+        case .invalidPublicKey:
+            return "Invalid device public key"
         case .cidMismatch:
             return "Receipt CID does not match decrypted content (tampering detected)"
         case .signatureVerificationFailed:
