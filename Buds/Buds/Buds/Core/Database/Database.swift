@@ -85,6 +85,11 @@ final class Database {
             try migrateReactionsToDID(db)
         }
 
+        // Migration v8: Jar receipt tables for distributed sync (Phase 10.3 Module 2)
+        migrator.registerMigration("v8_jar_receipts") { db in
+            try migrateToJarReceipts(db)
+        }
+
         return migrator
     }
 
@@ -643,6 +648,112 @@ private func migrateReactionsToDID(_ db: GRDB.Database) throws {
     """)
 
     print("✅ Migration v7 complete: Reactions now use sender_did")
+}
+
+// MARK: - Migration v8 (Phase 10.3 Module 2)
+
+private func migrateToJarReceipts(_ db: GRDB.Database) throws {
+    print("🔧 [MIGRATION v8] Starting jar receipt tables migration...")
+
+    // STEP 1: Create processed_jar_receipts table (replay protection)
+    try db.execute(sql: """
+        CREATE TABLE IF NOT EXISTS processed_jar_receipts (
+            receipt_cid TEXT PRIMARY KEY,
+            jar_id TEXT NOT NULL,
+            sequence_number INTEGER NOT NULL,
+            processed_at REAL NOT NULL,
+            UNIQUE(jar_id, sequence_number)
+        )
+    """)
+
+    try db.execute(sql: """
+        CREATE INDEX IF NOT EXISTS idx_processed_jar_receipts_jar
+        ON processed_jar_receipts(jar_id, sequence_number)
+    """)
+
+    print("✅ [MIGRATION v8] Created processed_jar_receipts table")
+
+    // STEP 2: Create jar_tombstones table (deletion safety)
+    try db.execute(sql: """
+        CREATE TABLE IF NOT EXISTS jar_tombstones (
+            jar_id TEXT PRIMARY KEY,
+            jar_name TEXT NOT NULL,
+            deleted_at REAL NOT NULL,
+            deleted_by_did TEXT NOT NULL
+        )
+    """)
+
+    print("✅ [MIGRATION v8] Created jar_tombstones table")
+
+    // STEP 3: Create jar_receipt_queue table (out-of-order receipt queueing)
+    try db.execute(sql: """
+        CREATE TABLE IF NOT EXISTS jar_receipt_queue (
+            id TEXT PRIMARY KEY,
+            jar_id TEXT NOT NULL,
+            receipt_cid TEXT NOT NULL,
+            parent_cid TEXT,
+            sequence_number INTEGER,
+            receipt_data BLOB NOT NULL,
+            queued_at REAL NOT NULL
+        )
+    """)
+
+    try db.execute(sql: """
+        CREATE INDEX IF NOT EXISTS idx_jar_receipt_queue_parent
+        ON jar_receipt_queue(parent_cid)
+    """)
+
+    try db.execute(sql: """
+        CREATE INDEX IF NOT EXISTS idx_jar_receipt_queue_jar
+        ON jar_receipt_queue(jar_id, sequence_number)
+    """)
+
+    print("✅ [MIGRATION v8] Created jar_receipt_queue table")
+
+    // STEP 4: Add columns to jars table
+    // Check if last_sequence_number column exists
+    let hasLastSequence = try Bool.fetchOne(db, sql: """
+        SELECT COUNT(*) > 0
+        FROM pragma_table_info('jars')
+        WHERE name = 'last_sequence_number'
+    """) ?? false
+
+    if !hasLastSequence {
+        try db.execute(sql: """
+            ALTER TABLE jars ADD COLUMN last_sequence_number INTEGER DEFAULT 0
+        """)
+        print("✅ [MIGRATION v8] Added last_sequence_number column to jars")
+    }
+
+    // Check if parent_cid column exists
+    let hasParentCid = try Bool.fetchOne(db, sql: """
+        SELECT COUNT(*) > 0
+        FROM pragma_table_info('jars')
+        WHERE name = 'parent_cid'
+    """) ?? false
+
+    if !hasParentCid {
+        try db.execute(sql: """
+            ALTER TABLE jars ADD COLUMN parent_cid TEXT
+        """)
+        print("✅ [MIGRATION v8] Added parent_cid column to jars")
+    }
+
+    // STEP 5: Backfill Solo jar with last_sequence_number = 0
+    let soloExists = try Bool.fetchOne(db, sql: """
+        SELECT COUNT(*) > 0 FROM jars WHERE id = 'solo'
+    """) ?? false
+
+    if soloExists {
+        try db.execute(sql: """
+            UPDATE jars SET last_sequence_number = 0 WHERE id = 'solo'
+        """)
+        print("✅ [MIGRATION v8] Backfilled Solo jar with last_sequence_number = 0")
+    } else {
+        print("⚠️  [MIGRATION v8] Solo jar not found (will be created on first login)")
+    }
+
+    print("🎉 [MIGRATION v8] Migration complete!")
 }
 
 struct DatabaseError: Error {
