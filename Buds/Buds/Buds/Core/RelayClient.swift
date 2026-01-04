@@ -12,11 +12,11 @@ import CryptoKit
 class RelayClient {
     static let shared = RelayClient()
     // Phase 10.3 Module 0.3: Production relay with deterministic phone encryption
-    private let baseURL = "https://buds-relay.getstreams.workers.dev"
+    let baseURL = "https://buds-relay.getstreams.workers.dev"  // Changed to internal for extensions
 
     private init() {}
 
-    private func authHeader() async throws -> [String: String] {
+    func authHeader() async throws -> [String: String] {  // Changed to internal for extensions
         guard let user = Auth.auth().currentUser else {
             throw RelayError.notAuthenticated
         }
@@ -320,6 +320,7 @@ enum RelayError: Error, LocalizedError {
     case serverError
     case userNotFound
     case invalidResponse
+    case httpError(statusCode: Int, message: String)  // Phase 10.3 Module 1: Detailed HTTP errors
 
     var errorDescription: String? {
         switch self {
@@ -331,6 +332,8 @@ enum RelayError: Error, LocalizedError {
             return "User not found"
         case .invalidResponse:
             return "Invalid relay response"
+        case .httpError(let statusCode, let message):
+            return "HTTP \(statusCode): \(message)"
         }
     }
 }

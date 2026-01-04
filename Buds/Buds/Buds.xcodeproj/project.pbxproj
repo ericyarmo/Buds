@@ -32,6 +32,8 @@
 		5893A3E12F032036001F310F /* StressTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3E02F032036001F310F /* StressTestView.swift */; };
 		5893A3E22F032036001F310F /* StressTestGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3DF2F032036001F310F /* StressTestGenerator.swift */; };
 		5893A3EF2F0625B0001F310F /* SafetyNumberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3EE2F0625B0001F310F /* SafetyNumberView.swift */; };
+		5893A3F12F0B2923001F310F /* JarReceipts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3F02F0B2923001F310F /* JarReceipts.swift */; };
+		5893A3F32F0B294B001F310F /* RelayClient+JarReceipts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3F22F0B294B001F310F /* RelayClient+JarReceipts.swift */; };
 		58FFD94B2EF2900D00C0A7DB /* Info-Template.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD93F2EF2900D00C0A7DB /* Info-Template.plist */; };
 		58FFD94C2EF2900D00C0A7DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD9492EF2900D00C0A7DB /* Assets.xcassets */; };
 		58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9282EF2900D00C0A7DB /* BudsApp.swift */; };
@@ -124,6 +126,8 @@
 		5893A3E02F032036001F310F /* StressTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTestView.swift; sourceTree = "<group>"; };
 		5893A3ED2F04C870001F310F /* Buds.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Buds.xctestplan; sourceTree = "<group>"; };
 		5893A3EE2F0625B0001F310F /* SafetyNumberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafetyNumberView.swift; sourceTree = "<group>"; };
+		5893A3F02F0B2923001F310F /* JarReceipts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarReceipts.swift; sourceTree = "<group>"; };
+		5893A3F22F0B294B001F310F /* RelayClient+JarReceipts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RelayClient+JarReceipts.swift"; sourceTree = "<group>"; };
 		58FFD8C92EF28ECE00C0A7DB /* Buds.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Buds.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8D62EF28ED100C0A7DB /* BudsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8E02EF28ED100C0A7DB /* BudsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -325,6 +329,7 @@
 		58FFD9372EF2900D00C0A7DB /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3F02F0B2923001F310F /* JarReceipts.swift */,
 				5893A3CF2F0279BD001F310F /* Reaction.swift */,
 				5893A3B42F01C98D001F310F /* Jar.swift */,
 				5893A3B52F01C98D001F310F /* JarMember.swift */,
@@ -341,6 +346,7 @@
 		58FFD9382EF2900D00C0A7DB /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3F22F0B294B001F310F /* RelayClient+JarReceipts.swift */,
 				5893A3C92F02119D001F310F /* DataResetUtility.swift */,
 				58FFD9B22EFE20C600C0A7DB /* JarManager.swift */,
 				58FFD9AC2EFC945600C0A7DB /* InboxManager.swift */,
@@ -644,6 +650,7 @@
 				58FFD9A12EFA2DF900C0A7DB /* ShareManager.swift in Sources */,
 				5893A3C12F01CD82001F310F /* JarPickerView.swift in Sources */,
 				58FFD9AD2EFC945600C0A7DB /* InboxManager.swift in Sources */,
+				5893A3F12F0B2923001F310F /* JarReceipts.swift in Sources */,
 				5893A3B72F01C98D001F310F /* JarMember.swift in Sources */,
 				5893A3B82F01C98D001F310F /* Jar.swift in Sources */,
 				5893A3CC2F021E8A001F310F /* EditMemoryView.swift in Sources */,
@@ -666,6 +673,7 @@
 				58FFD9562EF2900D00C0A7DB /* Memory.swift in Sources */,
 				58FFD9A52EFA2E2B00C0A7DB /* DeviceManager.swift in Sources */,
 				5893A3CA2F02119D001F310F /* DataResetUtility.swift in Sources */,
+				5893A3F32F0B294B001F310F /* RelayClient+JarReceipts.swift in Sources */,
 				58FFD9B12EFCDA2400C0A7DB /* EncryptedMessage.swift in Sources */,
 				5893A3D52F0279D9001F310F /* ReactionPicker.swift in Sources */,
 				5893A3D62F0279D9001F310F /* ReactionSummary.swift in Sources */,

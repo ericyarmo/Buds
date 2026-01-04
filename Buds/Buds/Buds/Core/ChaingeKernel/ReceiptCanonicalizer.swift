@@ -122,6 +122,127 @@ enum ReceiptCanonicalizer {
         return try enc.encode(.map(pairs))
     }
 
+    // MARK: - Jar Receipt Payloads (Phase 10.3 Module 1)
+
+    /// Encode JarCreatedPayload to canonical CBOR map
+    static func encodeJarCreatedPayload(_ payload: JarCreatedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        var pairs: [(CBORValue, CBORValue)] = [
+            (.text("jar_name"), .text(payload.jarName)),
+            (.text("owner_did"), .text(payload.ownerDID)),
+            (.text("created_at_ms"), .int(payload.createdAtMs))
+        ]
+
+        if let desc = payload.jarDescription {
+            pairs.append((.text("jar_description"), .text(desc)))
+        }
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode JarMemberAddedPayload to canonical CBOR map
+    static func encodeJarMemberAddedPayload(_ payload: JarMemberAddedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        let pairs: [(CBORValue, CBORValue)] = [
+            (.text("member_did"), .text(payload.memberDID)),
+            (.text("member_display_name"), .text(payload.memberDisplayName)),
+            (.text("member_phone_number"), .text(payload.memberPhoneNumber)),
+            (.text("added_by_did"), .text(payload.addedByDID)),
+            (.text("added_at_ms"), .int(payload.addedAtMs))
+        ]
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode JarInviteAcceptedPayload to canonical CBOR map
+    static func encodeJarInviteAcceptedPayload(_ payload: JarInviteAcceptedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        let pairs: [(CBORValue, CBORValue)] = [
+            (.text("member_did"), .text(payload.memberDID)),
+            (.text("accepted_at_ms"), .int(payload.acceptedAtMs))
+        ]
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode JarMemberRemovedPayload to canonical CBOR map
+    static func encodeJarMemberRemovedPayload(_ payload: JarMemberRemovedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        var pairs: [(CBORValue, CBORValue)] = [
+            (.text("member_did"), .text(payload.memberDID)),
+            (.text("removed_by_did"), .text(payload.removedByDID)),
+            (.text("removed_at_ms"), .int(payload.removedAtMs))
+        ]
+
+        if let reason = payload.reason {
+            pairs.append((.text("reason"), .text(reason)))
+        }
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode JarMemberLeftPayload to canonical CBOR map
+    static func encodeJarMemberLeftPayload(_ payload: JarMemberLeftPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        let pairs: [(CBORValue, CBORValue)] = [
+            (.text("member_did"), .text(payload.memberDID)),
+            (.text("left_at_ms"), .int(payload.leftAtMs))
+        ]
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode JarRenamedPayload to canonical CBOR map
+    static func encodeJarRenamedPayload(_ payload: JarRenamedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        let pairs: [(CBORValue, CBORValue)] = [
+            (.text("jar_name"), .text(payload.jarName)),
+            (.text("renamed_by_did"), .text(payload.renamedByDID)),
+            (.text("renamed_at_ms"), .int(payload.renamedAtMs))
+        ]
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode JarDeletedPayload to canonical CBOR map
+    static func encodeJarDeletedPayload(_ payload: JarDeletedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        let pairs: [(CBORValue, CBORValue)] = [
+            (.text("deleted_by_did"), .text(payload.deletedByDID)),
+            (.text("deleted_at_ms"), .int(payload.deletedAtMs)),
+            (.text("jar_name"), .text(payload.jarName))
+        ]
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode JarReceiptPayload (envelope with type-specific payload) to canonical CBOR
+    /// CRITICAL: NO sequence number (relay assigns in envelope)
+    static func encodeJarReceiptPayload(_ receipt: JarReceiptPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        var pairs: [(CBORValue, CBORValue)] = [
+            (.text("jar_id"), .text(receipt.jarID)),
+            (.text("receipt_type"), .text(receipt.receiptType)),
+            (.text("sender_did"), .text(receipt.senderDID)),
+            (.text("timestamp"), .int(receipt.timestamp)),
+            (.text("payload"), .bytes(receipt.payload))
+        ]
+
+        if let parentCID = receipt.parentCID {
+            pairs.append((.text("parent_cid"), .text(parentCID)))
+        }
+
+        return try enc.encode(.map(pairs))
+    }
+
     // MARK: - Decoding
 
     /// Decode raw CBOR to extract receipt fields

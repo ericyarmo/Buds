@@ -16,12 +16,12 @@
 Convert jars from local organizing buckets to synchronized group chats with proper distributed systems hardening AND crypto fixes.
 
 **Distributed Systems Hardening:**
-- ✅ Causal ordering with `parent_cid` chains
-- ✅ Sequence numbers for gap detection
+- ✅ Relay-assigned sequence numbers (conflict-free ordering)
+- ✅ Causal ordering with `parent_cid` chains (optional metadata)
 - ✅ Tombstones for deletion safety
 - ✅ Replay protection with processed receipt tracking
 - ✅ Server-side membership validation
-- ✅ Offline conflict detection
+- ✅ Offline conflict prevention (relay is source of truth)
 
 **Crypto Hardening (NEW):**
 - ✅ Phone-based identity (fixes multi-device DID problem)
@@ -38,24 +38,110 @@ Convert jars from local organizing buckets to synchronized group chats with prop
 
 ## Core Architecture Changes
 
-### 1. Receipt Structure (All Jar Receipts)
+### 1. Receipt Structure - Relay Envelope Architecture
 
-**Add causal ordering fields:**
+**CRITICAL ARCHITECTURE CHANGE (Dec 30, 2025):**
 
+**Problem:** If sequence_number is inside signed receipt bytes:
+- Client signs receipt before sending to relay
+- Relay assigns sequence after receiving
+- Signed bytes would need sequence → **paradox** (can't sign what you don't know)
+
+**Solution:** Separate signed payload from relay envelope
+
+**Receipt Payload (Client-Signed, Canonical CBOR):**
 ```swift
-// Common fields for ALL jar receipts
-struct JarReceiptBase: Codable {
+// What the CLIENT signs (stable, canonical)
+struct JarReceiptPayload: Codable {
     let jarID: String              // Which jar
-    let sequenceNumber: Int        // Monotonic per jar (1, 2, 3...)
-    let parentCID: String?         // Previous operation CID (causal chain)
-    let timestamp: Int64           // Local time (UX only, not for ordering)
+    let receiptType: String        // "jar.created", "jar.member_added", etc.
     let senderDID: String          // Who created this receipt
+    let timestamp: Int64           // Local time (UX only, not for ordering)
+    let parentCID: String?         // Previous operation CID (optional causal metadata)
+
+    // Payload-specific fields
+    let payload: Data              // Receipt-specific CBOR (member info, jar name, etc.)
+}
+
+// Client computes: CID(CBOR(payload)) → receipt_cid
+// Client signs: Ed25519(receipt_cid) → signature
+```
+
+**Relay Envelope (Relay Metadata, NOT Signed by Client):**
+```swift
+// What the RELAY adds (not part of signed bytes)
+struct RelayEnvelope {
+    let jarID: String              // Which jar (duplicated for indexing)
+    let sequenceNumber: Int        // AUTHORITATIVE (relay-assigned, UNIQUE)
+    let receiptCID: String         // CID of signed payload
+    let receiptData: Data          // The signed payload bytes (canonical CBOR)
+    let signature: Data            // Client's Ed25519 signature over receiptData
+    let senderDID: String          // Duplicated for indexing
+    let receivedAt: Int64          // When relay received it (server timestamp)
 }
 ```
+
+**Key Principles:**
+- `sequenceNumber` lives in relay envelope (NOT in signed bytes)
+- Client NEVER sees or predicts sequence (no clientSequenceHint)
+- Relay assigns sequence atomically: `MAX(sequence_number) + 1`
+- `UNIQUE(jar_id, sequence_number)` prevents conflicts
+- All clients apply receipts in relay-assigned order (deterministic)
+- Sequence is the ONLY apply order (parent_cid is optional metadata)
 
 **Why:**
 - `sequenceNumber`: Detect missing receipts (gap from 5 → 7 means 6 is missing)
 - `parentCID`: Causal chain (can't process receipt N+1 until receipt N arrives)
+
+---
+
+## Production-Grade Upgrades (Dec 30, 2025)
+
+### Upgrade A: Relay Envelope (CRITICAL)
+**Problem:** Can't include relay-assigned sequence in client-signed bytes.
+**Solution:** Separate receipt payload (signed) from relay envelope (metadata).
+- Receipt payload: jar_id, receipt_type, sender_did, timestamp, parent_cid, payload
+- Relay envelope: sequence_number, receipt_cid, receipt_data, signature, received_at
+- NO sequence_number inside signed bytes
+
+### Upgrade B: `/receipts?after=` API (Ergonomics)
+**Problem:** Most clients want "everything after my last seq", not from/to range.
+**Solution:** Add both APIs:
+- `GET /api/jars/{jar}/receipts?after={lastSeq}&limit=500` - Workhorse (normal sync)
+- `GET /api/jars/{jar}/receipts?from={seq}&to={seq}` - Gap filling (specific range)
+
+### Upgrade C: Backfill Lock (Prevent Storms)
+**Problem:** Multiple messages with gaps → multiple backfill requests for same range.
+**Solution:** Add per-jar backfill guard:
+- `backfill_in_progress_until` timestamp (local client state)
+- Prevents requesting same range 15 times in parallel
+- Example: If backfilling seq 5-10, don't request again until complete or timeout
+
+### Upgrade D: Queue Poisoning Detection (Dead Letter)
+**Problem:** Queued receipts that can never be applied (missing parent forever).
+**Solution:** Add poison detection fields to `jar_receipt_queue`:
+- `retry_count` - How many times we tried to process
+- `last_attempt_at` - When we last tried
+- `dead_letter_reason` - Why we gave up
+**Policy:** If retry_count > N or age > T, drop receipt + show toast/log.
+
+### Upgrade E: Membership Changes as Receipts (Single Source of Truth)
+**Problem:** Two sources of truth:
+- `jar.member_added` receipts (user-visible history)
+- `/api/jars/{jar}/sync` endpoint (relay access control state)
+**Risk:** Drift between "history says X, access control says Y"
+
+**Solution:** Receipts are truth, relay state is materialized view.
+- Membership changes ARE receipts (`jar.member_added`, `jar.member_removed`)
+- Relay `jar_members` table is updated by PROCESSING receipts
+- `/sync` endpoint becomes admin repair tool only (not primary API)
+- Prevents state drift: access control matches visible history
+
+**Implementation:**
+1. Client sends `jar.member_added` receipt → relay assigns sequence
+2. Relay processes receipt internally → updates `jar_members` table
+3. Relay broadcasts receipt to jar members
+4. All clients see same membership history + access control matches
 - Timestamp: For UI display only ("2 hours ago"), not for ordering
 
 ### 2. Database Schema (Migration v8)
@@ -420,7 +506,23 @@ struct SessionPayload: Codable {
 
 ---
 
-## Implementation Modules (Updated with Crypto)
+## Implementation Modules (Updated with Crypto + Relay Envelope)
+
+**⚠️ CRITICAL: RELAY ENVELOPE ARCHITECTURE (Jan 3, 2026)**
+
+This planning doc has been updated to reflect relay envelope architecture where:
+- **Sequence numbers are RELAY-ASSIGNED** (not client-generated)
+- **Client sends receipt WITHOUT sequence** → relay assigns authoritative sequence
+- **Client stores relay-assigned sequence** for gap detection
+- **All modules marked with ✅ UPDATED or ✅ COMPATIBLE** for clarity
+
+**Module Status:**
+- ✅ Module 0.1-0.6: Completed (CBOR pinning, phone identity, relay infrastructure)
+- ✅ Module 1: Updated for relay envelope (NO client sequences)
+- ✅ Module 2-3: Compatible (no sequence generation)
+- ✅ Module 4: Updated for relay envelope (gap detection uses relay sequences)
+- ✅ Module 5-6: Updated for relay envelope (NO client sequences, relay integration)
+- ✅ Module 7-10: Compatible (no jar receipt sequence generation)
 
 **NEW: Crypto modules added before distributed systems modules**
 
@@ -671,67 +773,186 @@ struct SessionPayload: Codable {
 
 ---
 
-### Module 0.6: Relay Infrastructure (3-4 hours)
+### Module 0.6: Relay Infrastructure (4-5 hours)
 
-**Critical: Server-side validation before any client work**
+**Critical: Relay envelope + production upgrades A-E**
+
+**ARCHITECTURE:** Relay is authoritative source of truth for:
+1. Sequence number assignment (atomic, conflict-free, in envelope)
+2. Jar membership state (materialized view from receipts)
+3. Receipt storage (backfill source)
 
 **Files to create:**
-- `buds-relay/src/jar_validation.ts` - Membership validation logic
-- `buds-relay/src/jar_storage.ts` - Jar state tracking
+- `buds-relay/migrations/0007_jar_receipts_and_members.sql` - D1 schema (relay envelope)
+- `buds-relay/src/handlers/jarReceipts.ts` - Receipt storage + backfill (both APIs)
+- `buds-relay/src/utils/jarValidation.ts` - Membership validation logic
+- `buds-relay/src/utils/receiptProcessor.ts` - Process receipts → update jar_members
 
 **Tasks:**
-1. Add `jar_members` table to relay D1 database
-   ```sql
-   CREATE TABLE jar_members (
-       jar_id TEXT NOT NULL,
-       member_did TEXT NOT NULL,
-       status TEXT NOT NULL,  -- 'active' | 'pending' | 'removed'
-       added_at INTEGER NOT NULL,
-       PRIMARY KEY (jar_id, member_did)
-   );
-   ```
 
-2. Update `/api/messages/send` endpoint:
-   - Validate sender is active member of jar
-   - Filter recipients to only active members
-   - Reject if sender not a member (403)
+**1. D1 Migration 0007 (Relay Envelope Structure):**
+```sql
+-- Jar membership state (materialized view from receipts)
+CREATE TABLE jar_members (
+    jar_id TEXT NOT NULL,
+    member_did TEXT NOT NULL,
+    status TEXT NOT NULL,          -- 'active' | 'pending' | 'removed'
+    role TEXT NOT NULL,             -- 'owner' | 'member'
+    added_at INTEGER NOT NULL,      -- From receipt timestamp
+    removed_at INTEGER,             -- From receipt timestamp
+    added_by_receipt_cid TEXT,      -- Which receipt added this member
+    removed_by_receipt_cid TEXT,    -- Which receipt removed this member
+    PRIMARY KEY (jar_id, member_did)
+);
 
-3. New endpoint: `/api/jars/{jar_id}/receipts?from={seq}&to={seq}`
-   - Return receipts for backfill
-   - Require authentication
-   - Only return if requester is active member
+CREATE INDEX idx_jar_members_did ON jar_members(member_did);
+CREATE INDEX idx_jar_members_jar_status ON jar_members(jar_id, status);
 
-4. New endpoint: `/api/jars/{jar_id}/sync`
-   - Accept jar membership updates from owner
-   - Store in relay database (authoritative state)
-   - Called when owner adds/removes members
+-- Jar receipts (relay envelope - separates signed payload from relay metadata)
+CREATE TABLE jar_receipts (
+    -- Relay envelope (NOT part of signed bytes)
+    jar_id TEXT NOT NULL,
+    sequence_number INTEGER NOT NULL,   -- AUTHORITATIVE (relay-assigned, UNIQUE)
+    receipt_cid TEXT NOT NULL,          -- CID of signed payload
+    receipt_data BLOB NOT NULL,         -- Signed payload bytes (canonical CBOR)
+    signature BLOB NOT NULL,            -- Client's Ed25519 signature
+    sender_did TEXT NOT NULL,           -- Duplicated for indexing
+    received_at INTEGER NOT NULL,       -- Server timestamp
+    parent_cid TEXT,                    -- Optional causal metadata (from payload)
+
+    PRIMARY KEY (jar_id, sequence_number)
+);
+
+-- CRITICAL: Ensure receipt_cid is globally unique (prevent duplicate receipts)
+CREATE UNIQUE INDEX idx_jar_receipts_cid ON jar_receipts(receipt_cid);
+
+-- Index for backfill queries (jar + sequence range)
+CREATE INDEX idx_jar_receipts_jar_seq ON jar_receipts(jar_id, sequence_number);
+
+-- Index for sender lookups
+CREATE INDEX idx_jar_receipts_sender ON jar_receipts(sender_did);
+```
+
+**2. POST /api/jars/{jar_id}/receipts - Store receipt + assign sequence (Upgrade A):**
+
+**Request:**
+```typescript
+{
+  "receipt_data": "base64...",    // Signed CBOR payload (NO sequence inside)
+  "signature": "base64...",       // Ed25519 signature over receipt_data
+  "parent_cid": "bafy..."         // Optional (extracted from payload, cached for indexing)
+}
+```
+
+**Response:**
+```typescript
+{
+  "success": true,
+  "receipt_cid": "bafy...",
+  "sequence_number": 5,           // AUTHORITATIVE (relay-assigned)
+  "jar_id": "uuid"
+}
+```
+
+**Implementation:**
+1. Validate sender is active member (403 if not)
+2. Compute receipt_cid from receipt_data
+3. Check idempotency (receipt_cid already exists?)
+4. Assign sequence atomically: `MAX(sequence_number) + 1`
+5. Store receipt + envelope metadata
+6. **Process receipt → update jar_members** (Upgrade E)
+7. Broadcast to active jar members (returns envelope with sequence)
+
+**3. GET /api/jars/{jar_id}/receipts - Backfill (Upgrades B):**
+
+**Two APIs:**
+
+**A) Normal sync (workhorse):**
+```
+GET /api/jars/{jar}/receipts?after={lastSeq}&limit=500
+```
+Returns receipts with `sequence_number > lastSeq` (up to limit).
+
+**B) Gap filling:**
+```
+GET /api/jars/{jar}/receipts?from={seq}&to={seq}
+```
+Returns receipts in range [from, to] (for specific gaps).
+
+**Response (both):**
+```typescript
+{
+  "receipts": [
+    {
+      "jar_id": "uuid",
+      "sequence_number": 5,
+      "receipt_cid": "bafy...",
+      "receipt_data": "base64...",   // Signed CBOR payload
+      "signature": "base64...",
+      "sender_did": "did:phone:...",
+      "received_at": 1234567890,
+      "parent_cid": "bafy..."        // Optional
+    }
+  ]
+}
+```
+
+**4. Receipt Processing (Upgrade E):**
+
+When relay stores receipt, immediately process to update `jar_members`:
+- `jar.created` → Insert owner into jar_members (role: owner, status: active)
+- `jar.member_added` → Insert member (role: member, status: pending)
+- `jar.invite_accepted` → Update status: pending → active
+- `jar.member_removed` → Update status: active → removed, set removed_at
+
+**5. Update /api/messages/send:**
+- Validate sender is active member (query jar_members)
+- Filter recipients to only active members
+- Reject if sender not a member (403)
 
 **Success criteria:**
-- Relay rejects receipts from non-members
-- Backfill endpoint returns missing receipts
-- Membership sync updates relay state
+- Relay envelope separates signed payload from metadata ✅
+- Sequence NOT in signed bytes ✅
+- Both `/receipts?after=` and `/receipts?from=&to=` APIs work ✅
+- jar_members updated automatically from receipts ✅
+- Membership validation enforced ✅
+- Curl tests pass ✅
 
-### Module 1: Receipt Types & Sequencing (3-4 hours)
+### Module 1: Receipt Types & Relay Integration (3-4 hours) ✅ UPDATED FOR RELAY ENVELOPE
+
+**⚠️ CRITICAL ARCHITECTURE CHANGE (Jan 3, 2026):**
+- **Sequence NOT in signed bytes** (relay assigns in envelope)
+- **Client sends receipt → relay assigns sequence → client stores relay sequence**
+- **NO client-side sequence generation** (relay is authoritative)
 
 **Files to create:**
-- `Core/Models/JarReceipts.swift` - All jar payload structs with sequencing
+- `Core/Models/JarReceipts.swift` - Jar payload structs (NO sequence field)
+- `Core/RelayClient+JarReceipts.swift` - Relay API integration
 
 **Files to modify:**
 - `Core/ChaingeKernel/ReceiptType.swift` - Add jar receipt types
-- `Core/ChaingeKernel/ReceiptCanonicalizer.swift` - Encode/decode with sequence numbers
+- `Core/ChaingeKernel/ReceiptCanonicalizer.swift` - Encode/decode WITHOUT sequence
 
 **Tasks:**
-1. Define JarReceiptBase with sequence + parent_cid
-2. Define 7 jar payload structs inheriting base
-3. Add canonicalization support (CBOR encoding preserves field order)
-4. Add sequence number generation (fetch last seq + 1)
+1. ❌ ~~Define JarReceiptBase with sequence + parent_cid~~
+   ✅ Define JarReceiptPayload WITHOUT sequence (relay envelope pattern)
+2. Define 7 jar payload structs (jar.created, jar.member_added, etc.)
+3. Add canonicalization support (CBOR encoding, NO sequence in signed bytes)
+4. ❌ ~~Add sequence number generation (fetch last seq + 1)~~
+   ✅ Add relay integration: POST /api/jars/{jar_id}/receipts → get sequence from response
 
 **Success criteria:**
-- Can generate jar.created with seq=1, parent_cid=nil
-- Can generate jar.member_added with seq=2, parent_cid=<jar.created CID>
-- Encode/decode round-trips correctly
+- Can generate jar.created WITHOUT sequence, sign it
+- Send to relay → relay assigns sequence (e.g., seq=1)
+- Store relay-assigned sequence locally
+- Can generate jar.member_added with parent_cid=<jar.created CID>
+- Encode/decode round-trips correctly (NO sequence in CBOR)
 
-### Module 2: Database Migration (2-3 hours)
+### Module 2: Database Migration (2-3 hours) ✅ RELAY ENVELOPE COMPATIBLE
+
+**⚠️ NOTE:** This module is already compatible with relay envelope architecture.
+- `last_sequence_number` in jars table stores RELAY-ASSIGNED sequence (not client-generated)
+- No changes needed for relay envelope
 
 **Files to modify:**
 - `Core/Database/Database.swift` - Migration v8
@@ -740,15 +961,19 @@ struct SessionPayload: Codable {
 1. Create processed_jar_receipts table
 2. Create jar_tombstones table
 3. Create jar_receipt_queue table
-4. Add last_sequence_number to jars table
-5. Backfill Solo jar with owner_did, sequence=0
+4. Add last_sequence_number to jars table (stores relay-assigned sequence)
+5. Backfill Solo jar with owner_did, last_sequence_number=0
 
 **Success criteria:**
 - Fresh install: v8 schema created
 - Existing install: v7 → v8 migration succeeds
 - No data loss
 
-### Module 3: Tombstone & Replay Protection (2-3 hours)
+### Module 3: Tombstone & Replay Protection (2-3 hours) ✅ RELAY ENVELOPE COMPATIBLE
+
+**⚠️ NOTE:** This module is already compatible with relay envelope architecture.
+- Tombstones and replay protection don't depend on sequence assignment
+- No changes needed for relay envelope
 
 **Files to create:**
 - `Core/Database/Repositories/JarTombstoneRepository.swift`
@@ -789,7 +1014,12 @@ struct SessionPayload: Codable {
 - Late receipts for deleted jar rejected
 - Receipt replays detected and skipped
 
-### Module 4: Dependency Resolution & Queueing (4-5 hours) ← MOST COMPLEX
+### Module 4: Dependency Resolution & Queueing (4-5 hours) ← MOST COMPLEX ✅ UPDATED FOR RELAY ENVELOPE
+
+**⚠️ CRITICAL:** Sequence numbers come from relay envelope, NOT signed payload
+- Client receives envelope with relay-assigned sequence
+- Client uses sequence for gap detection
+- Client never generates or predicts sequences
 
 **Files to create:**
 - `Core/JarSyncManager.swift` - New manager for jar receipt processing
@@ -804,7 +1034,7 @@ struct SessionPayload: Codable {
                jarID: receipt.jarID,
                receiptCID: receipt.cid,
                parentCID: receipt.parentCID,
-               sequenceNumber: receipt.sequenceNumber,
+               sequenceNumber: receipt.sequenceNumber,  // FROM RELAY ENVELOPE
                receiptData: receipt.rawCBOR,
                queuedAt: Date()
            )
@@ -815,19 +1045,24 @@ struct SessionPayload: Codable {
 
 2. Implement sequence gap detection + backfill request:
    ```swift
-   func processReceipt(_ receipt: JarReceipt) async throws {
-       let lastSeq = try await getLastSequence(jarID: receipt.jarID)
+   func processReceipt(_ envelope: RelayEnvelope) async throws {
+       // Get last sequence we processed (stored from previous relay envelope)
+       let lastSeq = try await getLastSequence(jarID: envelope.jarID)
        let expectedSeq = lastSeq + 1
 
-       if receipt.sequenceNumber > expectedSeq {
-           // Missing receipts [expectedSeq ... receipt.sequenceNumber - 1]
-           try await requestBackfill(jarID: receipt.jarID, from: expectedSeq, to: receipt.sequenceNumber - 1)
-           try await queueReceipt(receipt, reason: "sequence_gap")
+       if envelope.sequenceNumber > expectedSeq {
+           // Missing receipts [expectedSeq ... envelope.sequenceNumber - 1]
+           print("⚠️ Gap detected: expected \(expectedSeq), got \(envelope.sequenceNumber)")
+           try await requestBackfill(jarID: envelope.jarID, from: expectedSeq, to: envelope.sequenceNumber - 1)
+           try await queueReceipt(envelope, reason: "sequence_gap")
            return
        }
 
        // Process normally
-       try await applyReceipt(receipt)
+       try await applyReceipt(envelope)
+
+       // Update last sequence (from relay envelope)
+       try await updateLastSequence(envelope.jarID, envelope.sequenceNumber)
    }
    ```
 
@@ -836,6 +1071,7 @@ struct SessionPayload: Codable {
    func processQueuedReceipts(jarID: String) async throws {
        let queued = try await getQueuedReceipts(jarID: jarID)
 
+       // Sort by RELAY-ASSIGNED sequence (from envelope)
        for queuedReceipt in queued.sorted(by: { $0.sequenceNumber < $1.sequenceNumber }) {
            // Check if can process now
            if try await canProcess(queuedReceipt) {
@@ -849,30 +1085,49 @@ struct SessionPayload: Codable {
 **Success criteria:**
 - Out-of-order receipts queued
 - Missing receipts requested from relay
-- Queued receipts processed in order once deps satisfied
+- Queued receipts processed in relay sequence order
+- Gap detection uses relay-assigned sequences
 
-### Module 5: Jar Creation with Sync (2-3 hours)
+### Module 5: Jar Creation with Sync (2-3 hours) ✅ UPDATED FOR RELAY ENVELOPE
+
+**⚠️ CRITICAL ARCHITECTURE CHANGE:**
+- ❌ ~~Client generates receipt with sequence=1~~
+- ✅ Client generates receipt WITHOUT sequence, sends to relay, relay assigns sequence
+- ✅ Relay response contains authoritative sequence (likely 1 for jar.created, but relay decides)
 
 **Files to modify:**
-- `Core/JarManager.swift` - Generate jar.created receipt
+- `Core/JarManager.swift` - Generate jar.created receipt (NO sequence)
 - `Core/JarSyncManager.swift` - Process jar.created
+- `Core/RelayClient+JarReceipts.swift` - Send receipt to relay
 
 **Tasks:**
-1. Update createJar to generate receipt:
+1. ❌ ~~Update createJar to generate receipt with sequence=1~~
+   ✅ Update createJar to generate receipt, send to relay, store relay-assigned sequence:
    ```swift
    func createJar(name: String, description: String?) async throws -> Jar {
        // Create jar locally
        let jar = try await JarRepository.shared.createJar(...)
 
-       // Generate jar.created receipt (seq=1, parent_cid=nil)
+       // Generate jar.created receipt (NO sequence, NO parent_cid)
        let receipt = try await ReceiptManager.shared.createJarCreatedReceipt(
            jarID: jar.id,
            jarName: name,
            jarDescription: description,
-           ownerDID: currentDID,
-           sequenceNumber: 1,
-           parentCID: nil
+           ownerDID: currentDID
+           // NO sequenceNumber parameter
+           // NO parentCID parameter
        )
+
+       // Send to relay → relay assigns sequence
+       let response = try await RelayClient.shared.storeJarReceipt(
+           jarID: jar.id,
+           receiptData: receipt.rawCBOR,
+           signature: receipt.signature,
+           parentCID: nil  // Root receipt
+       )
+
+       // Store relay-assigned sequence (likely 1, but relay is authoritative)
+       try await JarRepository.shared.updateLastSequence(jar.id, response.sequenceNumber)
 
        // Update jar with receipt CID
        try await JarRepository.shared.updateReceiptCID(jar.id, receipt.cid)
@@ -886,42 +1141,104 @@ struct SessionPayload: Codable {
    - Check if already processed
    - Create jar (status: pending_invite)
    - Create jar_invite entry
+   - Store relay-assigned sequence from envelope
 
 **Success criteria:**
-- Create jar locally → jar.created receipt generated
+- Create jar locally → jar.created receipt generated WITHOUT sequence
+- Send to relay → relay assigns sequence (e.g., seq=1)
+- Store relay sequence locally
 - Receive jar.created → jar created as pending
 
-### Module 6: Member Invite Flow (4-5 hours)
+### Module 6: Member Invite Flow (4-5 hours) ✅ UPDATED FOR RELAY ENVELOPE
+
+**⚠️ CRITICAL ARCHITECTURE CHANGE:**
+- ❌ ~~Generate jar.member_added receipt (increment seq)~~
+- ✅ Generate jar.member_added WITHOUT sequence, send to relay, relay assigns sequence
+- ✅ Relay processes receipt → updates jar_members table (Upgrade E)
+- ✅ No separate sync endpoint needed (membership derived from receipts)
 
 **Files to modify:**
 - `Core/JarManager.swift` - Add member with sync
 - `Core/JarSyncManager.swift` - Process member_added/invite_accepted
 
 **Tasks:**
-1. Update addMember:
-   - Lookup DID via relay
-   - Get member devices
-   - Generate jar.member_added receipt (increment seq)
-   - Send jar.created + jar.member_added to new member
-   - Send jar.member_added to existing members
-   - **Call relay sync endpoint** to update authoritative state
+1. ❌ ~~Update addMember to generate receipt with incremented sequence~~
+   ✅ Update addMember to generate receipt, send to relay:
+   ```swift
+   func addMember(jarID: String, phoneNumber: String, displayName: String) async throws {
+       // Lookup DID via relay
+       let memberDID = try await RelayClient.shared.lookupDID(phoneNumber: phoneNumber)
+
+       // Get member devices
+       let devices = try await RelayClient.shared.getDevices(for: [memberDID])
+
+       // Get last receipt CID for parent_cid
+       let lastReceiptCID = try await JarRepository.shared.getLastReceiptCID(jarID)
+
+       // Generate jar.member_added receipt (NO sequence)
+       let receipt = try await ReceiptManager.shared.createMemberAddedReceipt(
+           jarID: jarID,
+           memberDID: memberDID,
+           memberDisplayName: displayName,
+           memberPhoneNumber: phoneNumber,
+           memberDevices: devices
+           // NO sequenceNumber parameter
+       )
+
+       // Send to relay → relay assigns sequence
+       let response = try await RelayClient.shared.storeJarReceipt(
+           jarID: jarID,
+           receiptData: receipt.rawCBOR,
+           signature: receipt.signature,
+           parentCID: lastReceiptCID
+       )
+
+       // Store relay-assigned sequence
+       try await JarRepository.shared.updateLastSequence(jarID, response.sequenceNumber)
+
+       // Relay broadcasts to jar members automatically
+       // Relay updates jar_members table automatically (Upgrade E)
+   }
+   ```
 
 2. Process jar.member_added on receive:
    - If you're the new member: store invite
    - If you're existing member: add to jar_members
+   - Store relay-assigned sequence from envelope
 
-3. Implement accept invite:
-   - Generate jar.invite_accepted receipt
-   - Send to owner + all members
-   - Update local status: pending → active
+3. Implement accept invite (same pattern - no client sequence):
+   ```swift
+   // Generate jar.invite_accepted receipt (NO sequence)
+   let receipt = try await ReceiptManager.shared.createInviteAcceptedReceipt(
+       jarID: jarID,
+       memberDID: currentDID
+   )
+
+   // Send to relay → relay assigns sequence
+   let response = try await RelayClient.shared.storeJarReceipt(
+       jarID: jarID,
+       receiptData: receipt.rawCBOR,
+       signature: receipt.signature,
+       parentCID: lastReceiptCID
+   )
+
+   // Relay broadcasts to all members
+   // Relay updates jar_members status: pending → active
+   ```
 
 **Success criteria:**
-- Add member → receipts sent to member + existing members
+- Add member → receipt sent to relay WITHOUT sequence
+- Relay assigns sequence, updates jar_members, broadcasts
 - Member receives invite → shows in UI
-- Member accepts → all members notified
-- **Relay membership state updated**
+- Member accepts → relay assigns sequence, broadcasts
+- **Relay membership state updated automatically from receipts**
 
-### Module 7: Bud Sharing with jar_id (2-3 hours)
+### Module 7: Bud Sharing with jar_id (2-3 hours) ✅ RELAY ENVELOPE COMPATIBLE
+
+**⚠️ NOTE:** This module is compatible with relay envelope architecture.
+- Bud receipts (session.created) don't use jar receipt sequences
+- jar_id is metadata in bud payload, not a jar operation
+- No changes needed for relay envelope
 
 **Files to modify:**
 - `Core/Models/UCRHeader.swift` - Add jar_id to SessionPayload
@@ -965,7 +1282,12 @@ struct SessionPayload: Codable {
 - Bud for missing jar → queued, jar requested
 - Bud for deleted jar → lands in Solo with metadata
 
-### Module 8: Offline Hardening (3-4 hours)
+### Module 8: Offline Hardening (3-4 hours) ✅ RELAY ENVELOPE COMPATIBLE
+
+**⚠️ NOTE:** This module is compatible with relay envelope architecture.
+- Offline operations queue receipts for relay (relay will assign sequences)
+- No client-side sequence generation
+- No changes needed for relay envelope
 
 **Files to create:**
 - `Core/OfflineQueueManager.swift` - Manage offline operations
@@ -1007,7 +1329,11 @@ struct SessionPayload: Codable {
 - Offline >7 days → full resync
 - Invalid operations discarded with toast
 
-### Module 9: UI Components (3-4 hours)
+### Module 9: UI Components (3-4 hours) ✅ RELAY ENVELOPE COMPATIBLE
+
+**⚠️ NOTE:** This module is compatible with relay envelope architecture.
+- UI displays jar state, doesn't generate sequences
+- No changes needed for relay envelope
 
 **Files to create:**
 - `Features/Circle/JarInviteCard.swift` - Pending invite card
@@ -1046,7 +1372,11 @@ struct SessionPayload: Codable {
 - Accept/decline works
 - Status badges clear
 
-### Module 10: Notifications & Polish (2-3 hours)
+### Module 10: Notifications & Polish (2-3 hours) ✅ RELAY ENVELOPE COMPATIBLE
+
+**⚠️ NOTE:** This module is compatible with relay envelope architecture.
+- Notifications triggered by processed receipts (relay-assigned sequences already stored)
+- No changes needed for relay envelope
 
 **Files to modify:**
 - `Core/InboxManager.swift` - Post notifications after processing
@@ -1215,16 +1545,16 @@ GET /api/jars/{jar_id}/members
 
 ## Open Questions / Decisions
 
-### 1. Conflict Resolution Strategy
+### 1. Conflict Resolution Strategy ✅ RESOLVED
 
 **Question:** When two operations have same sequence number (network partition), which wins?
 
-**Options:**
-- A) First-to-relay wins (relay assigns final sequence)
-- B) Owner's device_id as tiebreaker (deterministic)
-- C) Reject conflict, require manual resolution
-
-**Recommendation:** A (relay is source of truth)
+**Decision:** Relay-assigned sequences (Dec 30, 2025)
+- Relay atomically assigns sequences via `MAX(sequence_number) + 1`
+- `UNIQUE(jar_id, sequence_number)` constraint enforces one sequence per slot
+- Conflicts are **impossible** (database atomicity guarantees)
+- Client sends receipt → relay assigns sequence → broadcasts to members
+- All clients apply receipts in relay-assigned order (deterministic convergence)
 
 ### 2. Sequence Number Scope
 
