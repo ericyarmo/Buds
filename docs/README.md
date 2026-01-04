@@ -7,16 +7,23 @@ This directory contains all technical documentation for the Buds app.
 ### `/architecture/`
 Core technical architecture and specifications:
 - `ARCHITECTURE.md` - Overall system architecture and layers
-- `DATABASE_SCHEMA.md` - SQLite database schema and migrations
+- `DATABASE_SCHEMA.md` - SQLite database schema and migrations (current: v8)
 - `E2EE_DESIGN.md` - End-to-end encryption design
 - `PRIVACY_ARCHITECTURE.md` - Privacy and security architecture
 - `RECEIPT_SCHEMAS.md` - UCR (Universal Cannabis Receipt) schemas
 - `CANONICALIZATION_SPEC.md` - CBOR canonicalization specification
+- `JAR_ARCHITECTURE.md` - Jar sync architecture (relay envelope, sequences, CIDs)
+- `BUDS_CRYPTO_KEY_MAP.md` - Complete crypto key inventory
 
 ### `/planning/`
 Development plans and phase completion records:
 - `R1_MASTER_PLAN.md` - R1 release master plan
 - `PHASE_*_COMPLETE.md` - Completion records for each phase
+- **Phase 10.3 (Current):**
+  - `PHASE_10.3_FINAL_SUMMARY.md` - **START HERE** - Current roadmap (Modules 0.1-10)
+  - `PHASE_10.3_JAR_SYNC_HARDENED.md` - Master implementation plan (relay envelope architecture)
+  - `PHASE_10.3_CRYPTO_ADDENDUM.md` - Crypto blind spots & fixes (TOFU, multi-device, CBOR)
+  - `PHASE_10.3_EDGE_CASE_AUDIT.md` - Distributed systems edge cases
 - `PHASE_9A_TESTING_FLOW.md` - Phase 9a testing documentation (moved to /testing/)
 - `phase9-plan.md` - Phase 9 implementation plan
 - `phase9b-plan.md` - Phase 9b (Shelf View) plan
@@ -49,10 +56,12 @@ UI/UX design specifications:
 3. Review `/planning/R1_MASTER_PLAN.md` - See the roadmap
 
 ### For Agents/LLMs
-- **System Architecture**: See `/architecture/`
-- **Current Phase**: Check latest in `/planning/`
+- **Start Here**: `/planning/PHASE_10.3_FINAL_SUMMARY.md` - Current roadmap (Phase 10.3 Modules 0.1-10)
+- **System Architecture**: See `/architecture/JAR_ARCHITECTURE.md` - Jar sync (relay envelope, sequences, CIDs)
+- **Current Phase**: Phase 10.3 - Modules 2/10 complete (28-38 hours remaining)
 - **Testing**: See `/testing/PHASE_9A_TESTING_FLOW.md` for comprehensive test suite
 - **Features**: Feature-specific docs in `/features/`
+- **CBOR Policy**: `CBOR_POLICY.md` (root level) - **CRITICAL** - Library pinning (never upgrade SwiftCBOR)
 
 ### For Debugging
 - `/design/DEBUG_SYSTEM.md` - Debug console usage

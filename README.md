@@ -8,15 +8,15 @@ Built on receipt-first, local-first, privacy-by-default principles.
 
 ## Project Status
 
-**Current Build:** ✅ Phase 10.3 Module 0.3 Complete | Crypto Hardening in Progress 🔐
-**Date:** December 31, 2025
+**Current Build:** ✅ Phase 10.3 Module 2 Complete | Relay Envelope Architecture ✅
+**Date:** January 3, 2026
 **Version:** 1.0.0 (Beta)
 **Bundle ID:** `app.getbuds.buds`
 
-**Latest Milestone:** Phase 10.3 Module 0.3 Complete - Deterministic Phone Encryption ✅
-**Status:** Crypto hardening + distributed systems in progress
-**Next Up:** Module 0.4 (Dynamic Device Discovery) → Module 0.5 (Safety Numbers)
-**Goal:** Harden crypto & sync → Then TestFlight beta (20-50 users)
+**Latest Milestone:** Phase 10.3 Module 2 Complete - Database Migration v8 (Jar Receipt Tables) ✅
+**Status:** Relay envelope architecture implemented, distributed systems in progress
+**Next Up:** Module 3 (Tombstones + Replay Protection) → Module 4 (Dependency Resolution)
+**Goal:** Complete distributed jar sync → TestFlight beta (20-50 users)
 
 ---
 
@@ -50,8 +50,9 @@ Built on receipt-first, local-first, privacy-by-default principles.
    - CBOR encoding rules
 
 6. **[`DATABASE_SCHEMA.md`](./docs/DATABASE_SCHEMA.md)**
-   - GRDB schema (current migration: v7)
+   - GRDB schema (current migration: v8)
    - Tables: jars, jar_members, local_receipts, ucr_headers, blobs, reactions
+   - NEW (v8): processed_jar_receipts, jar_tombstones, jar_receipt_queue
 
 7. **[`E2EE_DESIGN.md`](./docs/E2EE_DESIGN.md)**
    - X25519 key agreement + AES-256-GCM
@@ -84,28 +85,57 @@ Built on receipt-first, local-first, privacy-by-default principles.
 - Requires BOTH DB leak + secrets leak to expose phones
 - Relay migrations: 0005 (account_salts), 0006 (encrypted_phone)
 
-### 🔜 Next Modules (Week 1)
-
-**Module 0.4: Dynamic Device Discovery (2-3h)**
+**Module 0.4: Dynamic Device Discovery (2-3h) ✅**
 - Fetch unknown devices from relay on-demand
 - Auto-pin new devices (updated TOFU)
 - Warning toast: "New device detected, verify safety number"
 
-**Module 0.5: Safety Number UI (1-2h)**
-- Generate safety number from DID + device pubkeys
+**Module 0.5: Safety Number UI (1-2h) ✅**
+- Generate safety number from DID + device pubkeys (canonical ordering)
 - Show in Circle member detail view
-- QR code + manual comparison
 - Optional TOFU verification for power users
 
-**Module 0.6: Relay Infrastructure (3-4h)**
-- Server-side membership validation
-- Removed members can't send receipts
-- Backfill endpoint for missing receipts
+**Module 0.6: Relay Infrastructure (4-5h) ✅**
+- Relay envelope architecture (sequence NOT in signed bytes)
+- CIDv1 compatibility (relay matches iOS exactly)
+- Race-safe sequence assignment (retry + UNIQUE constraint)
+- 4-layer security (CID, signature, auth, membership)
+- Relay migrations: 0007 (jar_receipts + jar_members tables)
 
-**Module 1: Receipt Types + Sequencing (3-4h)**
-- Add `sequenceNumber`, `parentCID` to all jar receipts
-- Causal ordering chains
-- Gap detection + backfill
+**Module 1: Receipt Types & Relay Integration (3-4h) ✅**
+- 7 jar receipt payload structs WITHOUT sequence field
+- CBOR canonicalization for jar receipts
+- Relay API integration (storeJarReceipt, getJarReceipts)
+- Client sends receipt → relay assigns authoritative sequence
+- Files: JarReceipts.swift, RelayClient+JarReceipts.swift
+
+**Module 2: Database Migration v8 (2-3h) ✅**
+- processed_jar_receipts table (replay protection)
+- jar_tombstones table (deletion safety)
+- jar_receipt_queue table (out-of-order queueing)
+- Added columns to jars: last_sequence_number, parent_cid
+- Stores relay-assigned sequences (not client-generated)
+
+### 🔜 Next Modules (Week 2)
+
+**Module 3: Tombstone & Replay Protection (2-3h)**
+- JarTombstoneRepository for deletion safety
+- Replay protection (check processed_jar_receipts)
+- Check tombstone before processing receipts
+
+**Module 4: Dependency Resolution & Queueing (4-5h)**
+- JarSyncManager for receipt processing
+- Sequence gap detection + backfill
+- Queue out-of-order receipts
+- Process queue when dependencies satisfied
+
+**Module 5: Jar Creation with Sync (2-3h)**
+- Generate jar.created receipt WITHOUT sequence
+- Send to relay → store relay-assigned sequence
+- Process jar.created on receive
+
+**Module 6-10: Jar Sync Flows (12-16h)**
+- Member invite flow, bud sharing, offline hardening, UI, polish
 
 ### Architecture Changes (Phase 10.3)
 
@@ -121,11 +151,14 @@ Built on receipt-first, local-first, privacy-by-default principles.
 - OLD: Unlocked SwiftCBOR dependency
 - NEW: Locked to 0.4.5 with golden tests
 
-**Distributed Systems:**
+**Distributed Systems (Relay Envelope Architecture):**
+- OLD: Client assigns sequence numbers (race conditions possible)
+- NEW: Relay assigns authoritative sequences (conflict-free)
+- Client sends receipt WITHOUT sequence → relay assigns → client stores
 - Sequence numbers for gap detection
 - Tombstones for deletion safety
-- Replay protection
-- Causal ordering with parentCID chains
+- Replay protection (processed_jar_receipts table)
+- Causal ordering with parentCID chains (optional metadata)
 
 ---
 
@@ -355,22 +388,27 @@ All planning docs organized in `docs/` folder:
 
 ## Roadmap
 
-**Current Focus:** Phase 10.3 - Crypto + Distributed Systems Hardening (50-70 hours)
+**Current Focus:** Phase 10.3 - Crypto + Distributed Systems Hardening (~28-38 hours remaining)
 
-**Week 1:** Crypto fixes
+**Completed (Modules 0.1-2):**
 - ✅ Module 0.1: CBOR pinning
 - ✅ Module 0.2: Phone-based identity
 - ✅ Module 0.3: Deterministic phone encryption
-- 🔜 Module 0.4: Dynamic device discovery
-- 🔜 Module 0.5: Safety number UI
-- 🔜 Module 0.6: Relay infrastructure
+- ✅ Module 0.4: Dynamic device discovery
+- ✅ Module 0.5: Safety number UI
+- ✅ Module 0.6: Relay infrastructure (relay envelope architecture)
+- ✅ Module 1: Receipt types & relay integration
+- ✅ Module 2: Database migration v8
 
-**Week 2:** Sync flows
-- 🔜 Module 1: Receipt sequencing
-- 🔜 Module 2: Database migration v8
-- 🔜 Module 3: Tombstones + replay protection
-- 🔜 Module 4: Dependency resolution
-- 🔜 Module 5-10: Jar sync flows
+**In Progress (Modules 3-10):**
+- 🔜 Module 3: Tombstones + replay protection (2-3h)
+- 🔜 Module 4: Dependency resolution & queueing (4-5h)
+- 🔜 Module 5: Jar creation with sync (2-3h)
+- 🔜 Module 6: Member invite flow (4-5h)
+- 🔜 Module 7: Bud sharing with jar_id (2-3h)
+- 🔜 Module 8: Offline hardening (3-4h)
+- 🔜 Module 9: UI components (3-4h)
+- 🔜 Module 10: Notifications & polish (2-3h)
 
 **Week 3:** Integration & testing
 - 🔜 Multi-device testing
@@ -394,13 +432,13 @@ Private project. Architecture by Claude (Anthropic) + Eric.
 
 ## Build Progress Tracker
 
-**Last Updated:** December 31, 2025
-**Current Phase:** Phase 10.3 Module 0.3 Complete ✅
-**Latest Commit:** Phase 10.3 Module 0.3 - Deterministic Phone Encryption
+**Last Updated:** January 3, 2026
+**Current Phase:** Phase 10.3 Module 2 Complete ✅
+**Latest Commit:** Phase 10.3 Module 2 - Database Migration v8 (Jar Receipt Tables)
 
-**Status:** Crypto hardening in progress (3/10 modules done)
-**Next Session:** Module 0.4 (Dynamic Device Discovery)
-**Estimated Time to Beta:** 40-60 hours remaining
+**Status:** Relay envelope architecture implemented (Modules 0.1-2 complete, 8 modules remaining)
+**Next Session:** Module 3 (Tombstone & Replay Protection)
+**Estimated Time to Beta:** 28-38 hours remaining
 
 ---
 
