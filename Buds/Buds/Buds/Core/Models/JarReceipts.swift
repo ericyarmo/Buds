@@ -116,6 +116,33 @@ struct JarDeletedPayload: Codable {
     let jarName: String             // For tombstone (UX)
 }
 
+// MARK: - Bud Operation Receipts
+
+/**
+ * jar.bud_shared - Member shares bud to jar
+ *
+ * Adds bud to jar (visible to all active members)
+ */
+struct JarBudSharedPayload: Codable {
+    let budUUID: String             // Which bud (UUID from ucr_headers)
+    let sharedByDID: String         // Who shared it (redundant with senderDID)
+    let sharedAtMs: Int64
+    let budCID: String              // CID of bud receipt (for verification)
+}
+
+/**
+ * jar.bud_deleted - Owner deletes bud from jar
+ *
+ * Removes bud from jar (propagates to all members)
+ * Validation: deletedByDID must match bud.ownerDID (only owner can delete)
+ */
+struct JarBudDeletedPayload: Codable {
+    let budUUID: String             // Which bud
+    let deletedByDID: String        // Who deleted it (must be bud owner)
+    let deletedAtMs: Int64          // Claimed time
+    let reason: String?             // "owner_deleted", "jar_deleted", etc.
+}
+
 // MARK: - Receipt Type Constants
 
 extension String {
@@ -126,6 +153,8 @@ extension String {
     static let jarMemberLeft = "jar.member_left"
     static let jarRenamed = "jar.renamed"
     static let jarDeleted = "jar.deleted"
+    static let jarBudShared = "jar.bud_shared"
+    static let jarBudDeleted = "jar.bud_deleted"
 }
 
 // MARK: - Relay Envelope (Receive-Only)

@@ -34,6 +34,8 @@
 		5893A3EF2F0625B0001F310F /* SafetyNumberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3EE2F0625B0001F310F /* SafetyNumberView.swift */; };
 		5893A3F12F0B2923001F310F /* JarReceipts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3F02F0B2923001F310F /* JarReceipts.swift */; };
 		5893A3F32F0B294B001F310F /* RelayClient+JarReceipts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3F22F0B294B001F310F /* RelayClient+JarReceipts.swift */; };
+		5893A3F52F0B7CA2001F310F /* JarTombstoneRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3F42F0B7CA2001F310F /* JarTombstoneRepository.swift */; };
+		5893A3F72F0B7CC8001F310F /* JarSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5893A3F62F0B7CC8001F310F /* JarSyncManager.swift */; };
 		58FFD94B2EF2900D00C0A7DB /* Info-Template.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD93F2EF2900D00C0A7DB /* Info-Template.plist */; };
 		58FFD94C2EF2900D00C0A7DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 58FFD9492EF2900D00C0A7DB /* Assets.xcassets */; };
 		58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FFD9282EF2900D00C0A7DB /* BudsApp.swift */; };
@@ -128,6 +130,8 @@
 		5893A3EE2F0625B0001F310F /* SafetyNumberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafetyNumberView.swift; sourceTree = "<group>"; };
 		5893A3F02F0B2923001F310F /* JarReceipts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarReceipts.swift; sourceTree = "<group>"; };
 		5893A3F22F0B294B001F310F /* RelayClient+JarReceipts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RelayClient+JarReceipts.swift"; sourceTree = "<group>"; };
+		5893A3F42F0B7CA2001F310F /* JarTombstoneRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarTombstoneRepository.swift; sourceTree = "<group>"; };
+		5893A3F62F0B7CC8001F310F /* JarSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarSyncManager.swift; sourceTree = "<group>"; };
 		58FFD8C92EF28ECE00C0A7DB /* Buds.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Buds.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8D62EF28ED100C0A7DB /* BudsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		58FFD8E02EF28ED100C0A7DB /* BudsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BudsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -310,6 +314,7 @@
 		58FFD9322EF2900D00C0A7DB /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3F42F0B7CA2001F310F /* JarTombstoneRepository.swift */,
 				5893A3D12F0279CA001F310F /* ReactionRepository.swift */,
 				58FFD9B82EFE20E900C0A7DB /* JarRepository.swift */,
 				58FFD9312EF2900D00C0A7DB /* MemoryRepository.swift */,
@@ -346,6 +351,7 @@
 		58FFD9382EF2900D00C0A7DB /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				5893A3F62F0B7CC8001F310F /* JarSyncManager.swift */,
 				5893A3F22F0B294B001F310F /* RelayClient+JarReceipts.swift */,
 				5893A3C92F02119D001F310F /* DataResetUtility.swift */,
 				58FFD9B22EFE20C600C0A7DB /* JarManager.swift */,
@@ -647,6 +653,7 @@
 				58FFD94D2EF2900D00C0A7DB /* BudsApp.swift in Sources */,
 				58FFD9892EF4BB2800C0A7DB /* AuthManager.swift in Sources */,
 				58FFD9942EF71BFE00C0A7DB /* CircleMember.swift in Sources */,
+				5893A3F52F0B7CA2001F310F /* JarTombstoneRepository.swift in Sources */,
 				58FFD9A12EFA2DF900C0A7DB /* ShareManager.swift in Sources */,
 				5893A3C12F01CD82001F310F /* JarPickerView.swift in Sources */,
 				58FFD9AD2EFC945600C0A7DB /* InboxManager.swift in Sources */,
@@ -710,6 +717,7 @@
 				58FFD95E2EF2900D00C0A7DB /* EffectTag.swift in Sources */,
 				58FFD9B92EFE20E900C0A7DB /* JarRepository.swift in Sources */,
 				58FFD95F2EF2900D00C0A7DB /* MemoryCard.swift in Sources */,
+				5893A3F72F0B7CC8001F310F /* JarSyncManager.swift in Sources */,
 				58FFD9972EF71C1100C0A7DB /* CircleManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

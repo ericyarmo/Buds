@@ -918,35 +918,57 @@ When relay stores receipt, immediately process to update `jar_members`:
 - Membership validation enforced ✅
 - Curl tests pass ✅
 
-### Module 1: Receipt Types & Relay Integration (3-4 hours) ✅ UPDATED FOR RELAY ENVELOPE
+### Module 1: Receipt Types & Relay Integration (3-4 hours) ✅ COMPLETE (Jan 3, 2026)
 
-**⚠️ CRITICAL ARCHITECTURE CHANGE (Jan 3, 2026):**
+**⚠️ CRITICAL ARCHITECTURE (Relay Envelope):**
 - **Sequence NOT in signed bytes** (relay assigns in envelope)
 - **Client sends receipt → relay assigns sequence → client stores relay sequence**
 - **NO client-side sequence generation** (relay is authoritative)
 
-**Files to create:**
-- `Core/Models/JarReceipts.swift` - Jar payload structs (NO sequence field)
+**Files created:**
+- `Core/Models/JarReceipts.swift` - 9 jar payload structs (NO sequence field)
 - `Core/RelayClient+JarReceipts.swift` - Relay API integration
 
-**Files to modify:**
-- `Core/ChaingeKernel/ReceiptType.swift` - Add jar receipt types
-- `Core/ChaingeKernel/ReceiptCanonicalizer.swift` - Encode/decode WITHOUT sequence
+**Files modified:**
+- `Core/ChaingeKernel/ReceiptCanonicalizer.swift` - CBOR encoding for 9 receipt types
 
-**Tasks:**
-1. ❌ ~~Define JarReceiptBase with sequence + parent_cid~~
-   ✅ Define JarReceiptPayload WITHOUT sequence (relay envelope pattern)
-2. Define 7 jar payload structs (jar.created, jar.member_added, etc.)
-3. Add canonicalization support (CBOR encoding, NO sequence in signed bytes)
-4. ❌ ~~Add sequence number generation (fetch last seq + 1)~~
-   ✅ Add relay integration: POST /api/jars/{jar_id}/receipts → get sequence from response
+**Implemented:**
+1. ✅ JarReceiptPayload (base envelope, NO sequence)
+2. ✅ 9 jar receipt types:
+   - `jar.created` - Owner creates jar
+   - `jar.member_added` - Owner adds member
+   - `jar.invite_accepted` - Member accepts invite
+   - `jar.member_removed` - Owner removes member
+   - `jar.member_left` - Member leaves voluntarily
+   - `jar.renamed` - Owner renames jar
+   - `jar.deleted` - Owner deletes jar
+   - `jar.bud_shared` - Member shares bud to jar ← **Added Jan 3**
+   - `jar.bud_deleted` - Owner deletes bud from jar ← **Added Jan 3**
+3. ✅ CBOR canonicalization for all 9 types
+4. ✅ Relay integration:
+   - `storeJarReceipt()` - POST /api/jars/{jar_id}/receipts
+   - `getJarReceipts(after:)` - Normal sync
+   - `getJarReceipts(from:to:)` - Gap filling
+5. ✅ RelayEnvelope struct (receive-only, has relay-assigned sequence)
+6. ✅ StoreReceiptResponse struct (relay returns sequence)
 
-**Success criteria:**
-- Can generate jar.created WITHOUT sequence, sign it
-- Send to relay → relay assigns sequence (e.g., seq=1)
+**Key Architecture:**
+- Signed payload: jarID, receiptType, senderDID, timestamp, parentCID, payload
+- Relay envelope (NOT signed): sequenceNumber, receiptCID, receiptData, signature, receivedAt
+- Client never generates sequences (relay is authoritative)
+
+**Deletion Semantics (Designed for TestFlight + Future RBAC):**
+- Bud deletion: `jar.bud_deleted` receipt propagates to all members
+- Validation: deletedByDID must match bud.ownerDID (only owner can delete)
+- Jar deletion: `jar.deleted` receipt → members move buds to Solo jar
+- Future: "Deleted Jars" namespace in Solo jar (post-beta polish)
+
+**Success criteria:** ✅ All achieved
+- Can generate receipts WITHOUT sequence, sign them
+- Send to relay → relay assigns sequence
 - Store relay-assigned sequence locally
-- Can generate jar.member_added with parent_cid=<jar.created CID>
-- Encode/decode round-trips correctly (NO sequence in CBOR)
+- CBOR encoding deterministic and canonical
+- Relay APIs work for store + backfill
 
 ### Module 2: Database Migration (2-3 hours) ✅ RELAY ENVELOPE COMPATIBLE
 
@@ -969,124 +991,464 @@ When relay stores receipt, immediately process to update `jar_members`:
 - Existing install: v7 → v8 migration succeeds
 - No data loss
 
-### Module 3: Tombstone & Replay Protection (2-3 hours) ✅ RELAY ENVELOPE COMPATIBLE
+### Module 3: Receipt Processing Pipeline (4-5 hours) ← **REWRITTEN JAN 3, 2026**
 
-**⚠️ NOTE:** This module is already compatible with relay envelope architecture.
-- Tombstones and replay protection don't depend on sequence assignment
-- No changes needed for relay envelope
+**⚠️ ARCHITECTURE REDESIGN:**
+This module builds the **core sync engine** - receives relay envelopes, verifies, applies to local state.
+Simple, no queueing yet (Module 4 adds gap detection + queueing).
+
+**Purpose:** Process in-order jar receipts from relay, maintain distributed jar state
 
 **Files to create:**
-- `Core/Database/Repositories/JarTombstoneRepository.swift`
+- `Core/JarSyncManager.swift` - **NEW** Main receipt processing pipeline (~300 lines)
+- `Core/Database/Repositories/JarTombstoneRepository.swift` - Tombstone CRUD (~80 lines)
 
 **Files to modify:**
-- `Core/JarManager.swift` - Create tombstone on delete
-- `Core/JarSyncManager.swift` - Check tombstone before processing
+- `Core/JarManager.swift` - Create tombstone on jar delete
+
+**JarSyncManager Architecture:**
+```swift
+class JarSyncManager: ObservableObject {
+    static let shared = JarSyncManager()
+
+    // MARK: - Main Entry Point
+
+    /// Process relay envelope (SIMPLE - no gap detection yet)
+    func processEnvelope(_ envelope: RelayEnvelope) async throws {
+        // 1. Replay protection
+        guard !isAlreadyProcessed(envelope.receiptCID) else {
+            print("⏭️ Skipping already processed receipt: \(envelope.receiptCID)")
+            return
+        }
+
+        // 2. Tombstone check
+        guard !isTombstoned(envelope.jarID) else {
+            print("🪦 Skipping receipt for tombstoned jar: \(envelope.jarID)")
+            return
+        }
+
+        // 3. Verify signature + CID
+        try verifyReceipt(envelope)
+
+        // 4. Apply receipt to local state
+        try await applyReceipt(envelope)
+
+        // 5. Mark as processed + update sequence
+        try await markProcessed(
+            receiptCID: envelope.receiptCID,
+            jarID: envelope.jarID,
+            sequenceNumber: envelope.sequenceNumber
+        )
+    }
+
+    // MARK: - Verification
+
+    func isAlreadyProcessed(_ receiptCID: String) -> Bool {
+        // Check processed_jar_receipts table
+    }
+
+    func isTombstoned(_ jarID: String) -> Bool {
+        // Check jar_tombstones table
+    }
+
+    func verifyReceipt(_ envelope: RelayEnvelope) throws {
+        // 1. Verify CID matches receiptData hash
+        // 2. Verify Ed25519 signature
+        // 3. Verify senderDID matches signature pubkey
+    }
+
+    // MARK: - Apply Receipts
+
+    func applyReceipt(_ envelope: RelayEnvelope) async throws {
+        // Decode receipt type
+        let payload = try decodeReceiptPayload(envelope.receiptData)
+
+        // Route to handler
+        switch payload.receiptType {
+        case .jarCreated:
+            try await applyJarCreated(envelope)
+        case .jarMemberAdded:
+            try await applyMemberAdded(envelope)
+        case .jarInviteAccepted:
+            try await applyInviteAccepted(envelope)
+        case .jarMemberRemoved:
+            try await applyMemberRemoved(envelope)
+        case .jarMemberLeft:
+            try await applyMemberLeft(envelope)
+        case .jarRenamed:
+            try await applyJarRenamed(envelope)
+        case .jarBudShared:
+            try await applyBudShared(envelope)
+        case .jarBudDeleted:
+            try await applyBudDeleted(envelope)
+        case .jarDeleted:
+            try await applyJarDeleted(envelope)
+        default:
+            throw SyncError.unknownReceiptType
+        }
+    }
+
+    // MARK: - Receipt Handlers (9 types)
+
+    func applyJarCreated(_ envelope: RelayEnvelope) async throws {
+        // Decode payload
+        let payload = try decodeJarCreatedPayload(envelope)
+
+        // Create jar locally (status: pending if not owner)
+        let jar = try await JarRepository.shared.createJar(
+            id: envelope.jarID,
+            name: payload.jarName,
+            description: payload.jarDescription,
+            ownerDID: payload.ownerDID,
+            lastSequenceNumber: envelope.sequenceNumber,
+            parentCID: envelope.receiptCID
+        )
+
+        // Add owner to jar_members (active)
+        try await JarMemberRepository.shared.addMember(
+            jarID: envelope.jarID,
+            did: payload.ownerDID,
+            role: .owner,
+            status: .active
+        )
+    }
+
+    func applyBudShared(_ envelope: RelayEnvelope) async throws {
+        // Decode payload
+        let payload = try decodeJarBudSharedPayload(envelope)
+
+        // Link bud to jar (ucr_headers.jar_id = envelope.jarID)
+        try await MemoryRepository.shared.updateJarID(
+            budUUID: payload.budUUID,
+            jarID: envelope.jarID
+        )
+
+        // Verify bud CID matches (optional integrity check)
+        let bud = try await MemoryRepository.shared.fetch(uuid: payload.budUUID)
+        guard bud?.cid == payload.budCID else {
+            throw SyncError.budCIDMismatch
+        }
+    }
+
+    func applyBudDeleted(_ envelope: RelayEnvelope) async throws {
+        // Decode payload
+        let payload = try decodeJarBudDeletedPayload(envelope)
+
+        // Validate: deletedByDID must match bud.ownerDID
+        let bud = try await MemoryRepository.shared.fetch(uuid: payload.budUUID)
+        guard bud?.did == payload.deletedByDID else {
+            throw SyncError.notBudOwner
+        }
+
+        // Remove bud from jar (ucr_headers.jar_id = NULL)
+        try await MemoryRepository.shared.updateJarID(
+            budUUID: payload.budUUID,
+            jarID: nil  // Unlink from jar
+        )
+
+        // Note: Bud still exists in ucr_headers (only unlinked from jar)
+        // If jar owner deletes jar, buds move to Solo (handled by applyJarDeleted)
+    }
+
+    func applyJarDeleted(_ envelope: RelayEnvelope) async throws {
+        // Decode payload
+        let payload = try decodeJarDeletedPayload(envelope)
+
+        // Create tombstone
+        try await JarTombstoneRepository.shared.create(
+            jarID: envelope.jarID,
+            jarName: payload.jarName,
+            deletedByDID: payload.deletedByDID
+        )
+
+        // Move jar buds to Solo jar
+        try await moveJarBudsToSolo(jarID: envelope.jarID)
+
+        // Delete jar locally
+        try await JarRepository.shared.delete(envelope.jarID)
+    }
+
+    // ... other handlers (member_added, invite_accepted, etc.)
+
+    // MARK: - Persistence
+
+    func markProcessed(receiptCID: String, jarID: String, sequenceNumber: Int) async throws {
+        // Insert into processed_jar_receipts
+        // Update jars.last_sequence_number = sequenceNumber
+        // Update jars.parent_cid = receiptCID
+    }
+}
+```
+
+**JarTombstoneRepository:**
+```swift
+class JarTombstoneRepository {
+    static let shared = JarTombstoneRepository()
+
+    func create(jarID: String, jarName: String, deletedByDID: String) async throws {
+        try await db.writeAsync { db in
+            try db.execute(sql: """
+                INSERT INTO jar_tombstones (jar_id, jar_name, deleted_at, deleted_by_did)
+                VALUES (?, ?, ?, ?)
+            """, arguments: [jarID, jarName, Date().timeIntervalSince1970, deletedByDID])
+        }
+    }
+
+    func isTombstoned(_ jarID: String) async throws -> Bool {
+        try await db.readAsync { db in
+            try Int.fetchOne(db, sql: "SELECT 1 FROM jar_tombstones WHERE jar_id = ?", arguments: [jarID]) != nil
+        }
+    }
+}
+```
 
 **Tasks:**
-1. Implement tombstone creation:
-   ```swift
-   func deleteJar(_ jarID: String) async throws {
-       // Soft delete: create tombstone
-       try await JarTombstoneRepository.shared.create(
-           jarID: jarID,
-           jarName: jar.name,
-           deletedByDID: ownerDID
-       )
-
-       // Delete local jar
-       try await JarRepository.shared.delete(jarID)
-   }
-   ```
-
-2. Implement replay protection:
-   ```swift
-   func isAlreadyProcessed(receiptCID: String) async throws -> Bool {
-       try await db.readAsync { db in
-           try Int.fetchOne(db, sql: "SELECT 1 FROM processed_jar_receipts WHERE receipt_cid = ?", arguments: [receiptCID]) != nil
-       }
-   }
-   ```
-
-3. Check tombstone before processing any jar receipt
+1. ✅ Create JarSyncManager.swift
+2. ✅ Implement replay protection (check processed_jar_receipts)
+3. ✅ Implement tombstone checking (check jar_tombstones)
+4. ✅ Implement signature + CID verification
+5. ✅ Implement 9 receipt handlers (jar.created, member_added, bud_shared, bud_deleted, jar_deleted, etc.)
+6. ✅ Create JarTombstoneRepository.swift
+7. ✅ Update JarManager.deleteJar() to create tombstone + generate jar.deleted receipt
 
 **Success criteria:**
-- Delete jar → tombstone created
-- Late receipts for deleted jar rejected
-- Receipt replays detected and skipped
+- ✅ Process jar.created → jar created locally
+- ✅ Process jar.bud_shared → bud linked to jar
+- ✅ Process jar.bud_deleted → bud unlinked from jar (validation: only owner can delete)
+- ✅ Process jar.deleted → tombstone created, buds moved to Solo, jar deleted
+- ✅ Replay protection works (skip already-processed receipts)
+- ✅ Tombstone protection works (skip receipts for deleted jars)
+- ✅ Signature verification works (invalid signatures rejected)
 
-### Module 4: Dependency Resolution & Queueing (4-5 hours) ← MOST COMPLEX ✅ UPDATED FOR RELAY ENVELOPE
+**Estimated:** 4-5 hours
 
-**⚠️ CRITICAL:** Sequence numbers come from relay envelope, NOT signed payload
-- Client receives envelope with relay-assigned sequence
-- Client uses sequence for gap detection
-- Client never generates or predicts sequences
+### Module 4: Gap Detection & Queueing (4-5 hours) ← **REWRITTEN JAN 3, 2026**
 
-**Files to create:**
-- `Core/JarSyncManager.swift` - New manager for jar receipt processing
+**⚠️ ARCHITECTURE REDESIGN:**
+This module **extends JarSyncManager** (from Module 3) with distributed systems hardening:
+- Sequence gap detection (relay-assigned sequences)
+- Receipt queueing for out-of-order arrivals
+- Backfill requests for missing receipts
+- Queue processing when dependencies satisfied
+
+**Purpose:** Handle imperfect network conditions (packet loss, out-of-order delivery)
+
+**Files to modify:**
+- `Core/JarSyncManager.swift` - Add gap detection + queueing (~150 lines added)
+
+**No new files** - extends existing JarSyncManager from Module 3
+
+**Architecture Changes to JarSyncManager:**
+
+**1. Replace Simple processEnvelope with Gap-Detecting Version:**
+```swift
+extension JarSyncManager {
+
+    /// Process envelope WITH gap detection (replaces Module 3 simple version)
+    func processEnvelope(_ envelope: RelayEnvelope) async throws {
+        // 1. Replay protection (same as Module 3)
+        guard !isAlreadyProcessed(envelope.receiptCID) else {
+            print("⏭️ Skipping already processed: \(envelope.receiptCID)")
+            return
+        }
+
+        // 2. Tombstone check (same as Module 3)
+        guard !isTombstoned(envelope.jarID) else {
+            print("🪦 Skipping tombstoned jar: \(envelope.jarID)")
+            return
+        }
+
+        // 3. **NEW: Gap detection**
+        let lastSeq = try await getLastSequence(jarID: envelope.jarID)
+        let expectedSeq = lastSeq + 1
+
+        if envelope.sequenceNumber > expectedSeq {
+            // Missing receipts detected!
+            print("⚠️ Gap: expected \(expectedSeq), got \(envelope.sequenceNumber)")
+
+            // Request missing receipts from relay
+            try await requestBackfill(
+                jarID: envelope.jarID,
+                from: expectedSeq,
+                to: envelope.sequenceNumber - 1
+            )
+
+            // Queue this receipt (can't process yet)
+            try await queueReceipt(envelope, reason: "sequence_gap")
+            return
+        }
+
+        if envelope.sequenceNumber < expectedSeq {
+            // Duplicate or late receipt (already processed higher sequences)
+            print("⏪ Late receipt: expected \(expectedSeq), got \(envelope.sequenceNumber)")
+            return
+        }
+
+        // 4. Process normally (sequence matches expected)
+        try verifyReceipt(envelope)
+        try await applyReceipt(envelope)
+        try await markProcessed(
+            receiptCID: envelope.receiptCID,
+            jarID: envelope.jarID,
+            sequenceNumber: envelope.sequenceNumber
+        )
+
+        // 5. **NEW: Try to process queued receipts**
+        try await processQueuedReceipts(jarID: envelope.jarID)
+    }
+
+    // MARK: - Queueing
+
+    func queueReceipt(_ envelope: RelayEnvelope, reason: String) async throws {
+        try await db.writeAsync { db in
+            try db.execute(sql: """
+                INSERT INTO jar_receipt_queue
+                (id, jar_id, receipt_cid, parent_cid, sequence_number, receipt_data, queued_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, arguments: [
+                UUID().uuidString,
+                envelope.jarID,
+                envelope.receiptCID,
+                envelope.parentCID,
+                envelope.sequenceNumber,  // FROM RELAY ENVELOPE
+                envelope.receiptData,
+                Date().timeIntervalSince1970
+            ])
+        }
+        print("📥 Queued receipt \(envelope.receiptCID) for \(envelope.jarID) (reason: \(reason))")
+    }
+
+    func processQueuedReceipts(jarID: String) async throws {
+        let queued = try await getQueuedReceipts(jarID: jarID)
+        guard !queued.isEmpty else { return }
+
+        print("🔄 Processing \(queued.count) queued receipts for \(jarID)")
+
+        // Sort by relay-assigned sequence (ascending)
+        let sorted = queued.sorted { $0.sequenceNumber < $1.sequenceNumber }
+
+        for queuedReceipt in sorted {
+            // Check if we can process now
+            let lastSeq = try await getLastSequence(jarID: jarID)
+            let expectedSeq = lastSeq + 1
+
+            if queuedReceipt.sequenceNumber == expectedSeq {
+                // Ready to process!
+                print("✅ Processing queued receipt seq=\(queuedReceipt.sequenceNumber)")
+
+                // Reconstruct RelayEnvelope
+                let envelope = RelayEnvelope(
+                    jarID: queuedReceipt.jarID,
+                    sequenceNumber: queuedReceipt.sequenceNumber,
+                    receiptCID: queuedReceipt.receiptCID,
+                    receiptData: queuedReceipt.receiptData,
+                    signature: Data(),  // Already verified before queueing
+                    senderDID: "",      // Already verified
+                    receivedAt: 0,
+                    parentCID: queuedReceipt.parentCID
+                )
+
+                // Process (verifyReceipt already done before queueing)
+                try await applyReceipt(envelope)
+                try await markProcessed(
+                    receiptCID: envelope.receiptCID,
+                    jarID: envelope.jarID,
+                    sequenceNumber: envelope.sequenceNumber
+                )
+
+                // Remove from queue
+                try await removeFromQueue(queuedReceipt.id)
+            } else {
+                // Still missing earlier receipts
+                print("⏸️ Still waiting for seq=\(expectedSeq) before \(queuedReceipt.sequenceNumber)")
+                break  // Can't process rest of queue yet
+            }
+        }
+    }
+
+    func requestBackfill(jarID: String, from: Int, to: Int) async throws {
+        print("🔁 Requesting backfill: \(jarID) seq=\(from)-\(to)")
+
+        // Call relay API for gap range
+        let envelopes = try await RelayClient.shared.getJarReceipts(
+            jarID: jarID,
+            from: from,
+            to: to
+        )
+
+        print("📬 Received \(envelopes.count) backfilled receipts")
+
+        // Process backfilled receipts in order
+        for envelope in envelopes.sorted(by: { $0.sequenceNumber < $1.sequenceNumber }) {
+            try await processEnvelope(envelope)
+        }
+    }
+
+    // MARK: - Helpers
+
+    func getLastSequence(jarID: String) async throws -> Int {
+        try await db.readAsync { db in
+            try Int.fetchOne(db, sql: "SELECT last_sequence_number FROM jars WHERE id = ?", arguments: [jarID]) ?? 0
+        }
+    }
+
+    func getQueuedReceipts(jarID: String) async throws -> [QueuedReceipt] {
+        try await db.readAsync { db in
+            try QueuedReceipt.fetchAll(db, sql: """
+                SELECT * FROM jar_receipt_queue WHERE jar_id = ?
+                ORDER BY sequence_number ASC
+            """, arguments: [jarID])
+        }
+    }
+
+    func removeFromQueue(_ queueID: String) async throws {
+        try await db.writeAsync { db in
+            try db.execute(sql: "DELETE FROM jar_receipt_queue WHERE id = ?", arguments: [queueID])
+        }
+    }
+}
+
+struct QueuedReceipt {
+    let id: String
+    let jarID: String
+    let receiptCID: String
+    let parentCID: String?
+    let sequenceNumber: Int
+    let receiptData: Data
+    let queuedAt: TimeInterval
+}
+```
 
 **Tasks:**
-1. Implement receipt queueing for missing dependencies:
-   ```swift
-   func queueReceipt(_ receipt: JarReceipt, reason: String) async throws {
-       try await db.writeAsync { db in
-           let queue = JarReceiptQueue(
-               id: UUID(),
-               jarID: receipt.jarID,
-               receiptCID: receipt.cid,
-               parentCID: receipt.parentCID,
-               sequenceNumber: receipt.sequenceNumber,  // FROM RELAY ENVELOPE
-               receiptData: receipt.rawCBOR,
-               queuedAt: Date()
-           )
-           try queue.insert(db)
-       }
-   }
-   ```
+1. ✅ Replace simple `processEnvelope` with gap-detecting version
+2. ✅ Add sequence gap detection (expected vs actual)
+3. ✅ Implement `queueReceipt()` - Store in jar_receipt_queue table
+4. ✅ Implement `requestBackfill()` - Call relay API for missing range
+5. ✅ Implement `processQueuedReceipts()` - Try to unblock queue after each receipt
+6. ✅ Add helper: `getLastSequence()`, `getQueuedReceipts()`, `removeFromQueue()`
 
-2. Implement sequence gap detection + backfill request:
-   ```swift
-   func processReceipt(_ envelope: RelayEnvelope) async throws {
-       // Get last sequence we processed (stored from previous relay envelope)
-       let lastSeq = try await getLastSequence(jarID: envelope.jarID)
-       let expectedSeq = lastSeq + 1
-
-       if envelope.sequenceNumber > expectedSeq {
-           // Missing receipts [expectedSeq ... envelope.sequenceNumber - 1]
-           print("⚠️ Gap detected: expected \(expectedSeq), got \(envelope.sequenceNumber)")
-           try await requestBackfill(jarID: envelope.jarID, from: expectedSeq, to: envelope.sequenceNumber - 1)
-           try await queueReceipt(envelope, reason: "sequence_gap")
-           return
-       }
-
-       // Process normally
-       try await applyReceipt(envelope)
-
-       // Update last sequence (from relay envelope)
-       try await updateLastSequence(envelope.jarID, envelope.sequenceNumber)
-   }
-   ```
-
-3. Implement queue processing (after dependencies satisfied):
-   ```swift
-   func processQueuedReceipts(jarID: String) async throws {
-       let queued = try await getQueuedReceipts(jarID: jarID)
-
-       // Sort by RELAY-ASSIGNED sequence (from envelope)
-       for queuedReceipt in queued.sorted(by: { $0.sequenceNumber < $1.sequenceNumber }) {
-           // Check if can process now
-           if try await canProcess(queuedReceipt) {
-               try await processReceipt(queuedReceipt)
-               try await removeFromQueue(queuedReceipt.id)
-           }
-       }
-   }
-   ```
+**Edge Cases Handled:**
+- **Gap detected (seq=5, expect 3):** Request backfill 3-4, queue 5, wait
+- **Duplicate (seq=2, expect 5):** Skip (already processed)
+- **Out-of-order arrival:** Queue until dependencies satisfied
+- **Backfill completes:** Process queue in sequence order
+- **Multiple gaps:** Handled recursively (backfill → process → check queue → repeat)
 
 **Success criteria:**
-- Out-of-order receipts queued
-- Missing receipts requested from relay
-- Queued receipts processed in relay sequence order
-- Gap detection uses relay-assigned sequences
+- ✅ Receive seq=1,2,4 → detects gap at 3, requests backfill
+- ✅ Backfill arrives → processes 3, then queued 4
+- ✅ Out-of-order (4 before 3) → queues 4, waits for 3
+- ✅ All receipts eventually processed in relay sequence order
+- ✅ No duplicate processing (replay protection from Module 3)
+- ✅ Queue automatically empties when dependencies satisfied
+
+**Estimated:** 4-5 hours
+
+**Why This Works:**
+- Relay sequences are authoritative (conflict-free)
+- Gap detection is simple: `expected != actual`
+- Queue is temporary (eventually drains)
+- Idempotent (replay protection prevents duplication)
 
 ### Module 5: Jar Creation with Sync (2-3 hours) ✅ UPDATED FOR RELAY ENVELOPE
 

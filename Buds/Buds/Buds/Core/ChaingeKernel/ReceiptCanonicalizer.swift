@@ -223,6 +223,37 @@ enum ReceiptCanonicalizer {
         return try enc.encode(.map(pairs))
     }
 
+    /// Encode JarBudSharedPayload to canonical CBOR map
+    static func encodeJarBudSharedPayload(_ payload: JarBudSharedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        let pairs: [(CBORValue, CBORValue)] = [
+            (.text("bud_uuid"), .text(payload.budUUID)),
+            (.text("shared_by_did"), .text(payload.sharedByDID)),
+            (.text("shared_at_ms"), .int(payload.sharedAtMs)),
+            (.text("bud_cid"), .text(payload.budCID))
+        ]
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /// Encode JarBudDeletedPayload to canonical CBOR map
+    static func encodeJarBudDeletedPayload(_ payload: JarBudDeletedPayload) throws -> Data {
+        let enc = CBORCanonical()
+
+        var pairs: [(CBORValue, CBORValue)] = [
+            (.text("bud_uuid"), .text(payload.budUUID)),
+            (.text("deleted_by_did"), .text(payload.deletedByDID)),
+            (.text("deleted_at_ms"), .int(payload.deletedAtMs))
+        ]
+
+        if let reason = payload.reason {
+            pairs.append((.text("reason"), .text(reason)))
+        }
+
+        return try enc.encode(.map(pairs))
+    }
+
     /// Encode JarReceiptPayload (envelope with type-specific payload) to canonical CBOR
     /// CRITICAL: NO sequence number (relay assigns in envelope)
     static func encodeJarReceiptPayload(_ receipt: JarReceiptPayload) throws -> Data {
