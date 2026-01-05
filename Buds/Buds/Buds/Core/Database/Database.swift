@@ -90,6 +90,11 @@ final class Database {
             try migrateToJarReceipts(db)
         }
 
+        // Migration v9: Queue envelope fields for gap detection (Phase 10.3 Module 4)
+        migrator.registerMigration("v9_queue_envelope_fields") { db in
+            try migrateQueueEnvelopeFields(db)
+        }
+
         return migrator
     }
 
@@ -754,6 +759,57 @@ private func migrateToJarReceipts(_ db: GRDB.Database) throws {
     }
 
     print("🎉 [MIGRATION v8] Migration complete!")
+}
+
+// MARK: - Migration v9 (Phase 10.3 Module 4)
+
+private func migrateQueueEnvelopeFields(_ db: GRDB.Database) throws {
+    print("🔧 [MIGRATION v9] Adding envelope fields to jar_receipt_queue...")
+
+    // Add signature column (BLOB for raw bytes)
+    try db.execute(sql: """
+        ALTER TABLE jar_receipt_queue ADD COLUMN signature BLOB
+    """)
+    print("✅ [MIGRATION v9] Added signature column")
+
+    // Add sender_did column
+    try db.execute(sql: """
+        ALTER TABLE jar_receipt_queue ADD COLUMN sender_did TEXT
+    """)
+    print("✅ [MIGRATION v9] Added sender_did column")
+
+    // Add retry tracking columns for poison detection
+    try db.execute(sql: """
+        ALTER TABLE jar_receipt_queue ADD COLUMN retry_count INTEGER DEFAULT 0
+    """)
+    print("✅ [MIGRATION v9] Added retry_count column")
+
+    try db.execute(sql: """
+        ALTER TABLE jar_receipt_queue ADD COLUMN last_retry_at REAL
+    """)
+    print("✅ [MIGRATION v9] Added last_retry_at column")
+
+    try db.execute(sql: """
+        ALTER TABLE jar_receipt_queue ADD COLUMN poison_reason TEXT
+    """)
+    print("✅ [MIGRATION v9] Added poison_reason column")
+
+    // Add jar_sync_state table for tracking halted jars and backfill state
+    try db.execute(sql: """
+        CREATE TABLE IF NOT EXISTS jar_sync_state (
+            jar_id TEXT PRIMARY KEY,
+            is_halted INTEGER DEFAULT 0,
+            halt_reason TEXT,
+            halted_at REAL,
+            next_backfill_at REAL,
+            backfill_from INTEGER,
+            backfill_to INTEGER,
+            backfill_attempt INTEGER DEFAULT 0
+        )
+    """)
+    print("✅ [MIGRATION v9] Created jar_sync_state table")
+
+    print("🎉 [MIGRATION v9] Migration complete!")
 }
 
 struct DatabaseError: Error {

@@ -1,36 +1,146 @@
 /**
- * JarSyncManager (Phase 10.3 Module 3)
+ * JarSyncManager (Phase 10.3 Module 4)
  *
  * Core sync engine - receives relay envelopes, verifies, applies to local state.
+ * Handles imperfect networks: out-of-order delivery, packet loss, incomplete backfills.
  *
  * CRITICAL ARCHITECTURE (Relay Envelope):
  * - Client sends receipt WITHOUT sequence → relay assigns authoritative sequence
  * - This manager processes relay envelopes (which HAVE relay-assigned sequences)
- * - Module 3: Simple in-order processing (no gap detection yet)
- * - Module 4: Adds gap detection + queueing (extends this class)
+ * - Gap detection: seq > expected → queue + backfill
+ * - Late/duplicate: seq < expected → skip
+ * - Happy path: seq == expected → process + try queue
  *
  * Processing Pipeline:
  * 1. Replay protection (check processed_jar_receipts)
  * 2. Tombstone check (skip deleted jars)
- * 3. Signature + CID verification
- * 4. Apply receipt to local state (route to type-specific handler)
- * 5. Mark as processed + update sequence
+ * 3. Halt check (skip halted jars - need manual intervention)
+ * 4. Gap detection (queue if seq > expected, skip if seq < expected)
+ * 5. Signature + CID verification
+ * 6. Apply receipt to local state (route to type-specific handler)
+ * 7. Mark as processed + update sequence
+ * 8. Process queued receipts (if any now unblocked)
  *
  * Receipt Types (9 total):
  * - jar.created, jar.member_added, jar.invite_accepted
  * - jar.member_removed, jar.member_left, jar.renamed
  * - jar.bud_shared, jar.bud_deleted, jar.deleted
+ *
+ * Concurrency Safety:
+ * - JarSyncState actor handles all mutable state
+ * - Prevents concurrent queue processing for same jar
+ * - Prevents overlapping backfill requests
+ *
+ * Poison Handling:
+ * - Poison receipt = can't process (verification fails, decode fails, etc.)
+ * - Poison HALTS the jar (maintains sequence invariant)
+ * - Halted jars require manual intervention or app restart to retry
  */
 
 import Foundation
 import GRDB
 import CryptoKit
 
+// MARK: - Actor for Concurrency-Safe State
+
+/// Actor to manage sync state safely across concurrent calls
+actor JarSyncState {
+    /// Jars currently having their queues processed
+    private var processingQueues: Set<String> = []
+
+    /// Active backfill requests per jar (prevents storm)
+    private var backfillInProgress: [String: BackfillState] = [:]
+
+    struct BackfillState {
+        let from: Int
+        let to: Int
+        let until: Date
+    }
+
+    // MARK: - Queue Processing Guards
+
+    func tryStartQueueProcessing(jarID: String) -> Bool {
+        if processingQueues.contains(jarID) {
+            return false
+        }
+        processingQueues.insert(jarID)
+        return true
+    }
+
+    func finishQueueProcessing(jarID: String) {
+        processingQueues.remove(jarID)
+    }
+
+    // MARK: - Backfill Guards
+
+    func shouldSkipBackfill(jarID: String, from: Int, to: Int) -> Bool {
+        guard let state = backfillInProgress[jarID] else { return false }
+        // Skip if: lock not expired AND requested range is subset of in-progress range
+        return state.until > Date() && from >= state.from && to <= state.to
+    }
+
+    func startBackfill(jarID: String, from: Int, to: Int, lockDuration: TimeInterval = 15) {
+        backfillInProgress[jarID] = BackfillState(
+            from: from,
+            to: to,
+            until: Date().addingTimeInterval(lockDuration)
+        )
+    }
+
+    func finishBackfill(jarID: String) {
+        backfillInProgress.removeValue(forKey: jarID)
+    }
+}
+
+// MARK: - QueuedReceipt Model
+
+struct QueuedReceipt: Codable, FetchableRecord, PersistableRecord {
+    let id: String
+    let jarID: String
+    let sequenceNumber: Int
+    let receiptCID: String
+    let receiptData: Data
+    let signature: Data
+    let senderDID: String
+    let parentCID: String?
+    let queuedAt: TimeInterval
+    var retryCount: Int
+    var lastRetryAt: TimeInterval?
+    var poisonReason: String?
+
+    static let databaseTableName = "jar_receipt_queue"
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case jarID = "jar_id"
+        case sequenceNumber = "sequence_number"
+        case receiptCID = "receipt_cid"
+        case receiptData = "receipt_data"
+        case signature
+        case senderDID = "sender_did"
+        case parentCID = "parent_cid"
+        case queuedAt = "queued_at"
+        case retryCount = "retry_count"
+        case lastRetryAt = "last_retry_at"
+        case poisonReason = "poison_reason"
+    }
+}
+
+// MARK: - JarSyncManager
+
 class JarSyncManager {
     static let shared = JarSyncManager()
 
     private let db: Database
     private let tombstoneRepo: JarTombstoneRepository
+    private let syncState = JarSyncState()
+
+    /// Poison thresholds
+    private let maxRetries = 5
+    private let maxQueueAge: TimeInterval = 7 * 24 * 60 * 60  // 7 days
+
+    /// Backfill retry delays (exponential backoff)
+    private let backfillRetryDelays: [TimeInterval] = [5, 15, 60, 300, 900]  // 5s, 15s, 1m, 5m, 15m
 
     private init() {
         self.db = Database.shared
@@ -40,37 +150,121 @@ class JarSyncManager {
     // MARK: - Main Entry Point
 
     /**
-     * Process relay envelope (Module 3: simple, no gap detection)
+     * Process relay envelope with gap detection and queueing (Module 4)
      *
-     * Module 4 will replace this with gap-detecting version
+     * - Parameter envelope: The relay envelope to process
+     * - Parameter skipGapDetection: If true, skip gap detection (used for backfill and queue processing)
+     *
+     * INVARIANTS:
+     * - Receipts processed in relay sequence order (1, 2, 3, ...)
+     * - Gaps trigger backfill requests
+     * - Out-of-order receipts queued until dependencies satisfied
+     * - Poison receipts HALT the jar (not skipped)
      */
-    func processEnvelope(_ envelope: RelayEnvelope) async throws {
-        // 1. Replay protection
+    func processEnvelope(_ envelope: RelayEnvelope, skipGapDetection: Bool = false) async throws {
+        let jarPrefix = String(envelope.jarID.prefix(8))
+
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 1: REPLAY PROTECTION
+        // ═══════════════════════════════════════════════════════════════
+
         guard !(try await isAlreadyProcessed(envelope.receiptCID)) else {
-            print("⏭️ Skipping already processed receipt: \(envelope.receiptCID)")
+            print("⏭️ [REPLAY] Skipping: \(String(envelope.receiptCID.prefix(12)))...")
             return
         }
 
-        // 2. Tombstone check
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 2: TOMBSTONE CHECK
+        // ═══════════════════════════════════════════════════════════════
+
         guard !(try await tombstoneRepo.isTombstoned(envelope.jarID)) else {
-            print("🪦 Skipping receipt for tombstoned jar: \(envelope.jarID)")
+            print("🪦 [TOMBSTONE] Skipping receipt for deleted jar: \(jarPrefix)...")
             return
         }
 
-        // 3. Verify signature + CID
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 3: HALT CHECK
+        // ═══════════════════════════════════════════════════════════════
+
+        if try await isJarHalted(envelope.jarID) {
+            print("🛑 [HALTED] Skipping receipt for halted jar: \(jarPrefix)...")
+            throw SyncError.jarHalted(jarID: envelope.jarID)
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 4: GAP DETECTION (only for normal processing)
+        // ═══════════════════════════════════════════════════════════════
+
+        if !skipGapDetection {
+            let lastSeq = try await getLastSequence(jarID: envelope.jarID)
+            let expectedSeq = lastSeq + 1
+
+            // CASE A: seq > expected → GAP DETECTED
+            if envelope.sequenceNumber > expectedSeq {
+                print("⚠️ [GAP] jar=\(jarPrefix) expected=\(expectedSeq) got=\(envelope.sequenceNumber)")
+
+                // Verify BEFORE queueing (don't queue invalid receipts)
+                do {
+                    try await verifyReceipt(envelope)
+                } catch {
+                    print("❌ [VERIFY] Receipt failed verification, not queueing: \(error)")
+                    throw error
+                }
+
+                // Queue this receipt
+                try await queueReceipt(envelope)
+
+                // Request missing receipts
+                try await requestBackfill(
+                    jarID: envelope.jarID,
+                    from: expectedSeq,
+                    to: envelope.sequenceNumber - 1
+                )
+
+                return
+            }
+
+            // CASE B: seq < expected → LATE/DUPLICATE
+            if envelope.sequenceNumber < expectedSeq {
+                print("⏪ [LATE] jar=\(jarPrefix) expected=\(expectedSeq) got=\(envelope.sequenceNumber)")
+                return
+            }
+
+            // CASE C: seq == expected → HAPPY PATH (fall through)
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 5: VERIFY RECEIPT
+        // ═══════════════════════════════════════════════════════════════
+
         try await verifyReceipt(envelope)
 
-        // 4. Apply receipt to local state
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 6: APPLY RECEIPT
+        // ═══════════════════════════════════════════════════════════════
+
         try await applyReceipt(envelope)
 
-        // 5. Mark as processed + update sequence
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 7: MARK AS PROCESSED
+        // ═══════════════════════════════════════════════════════════════
+
         try await markProcessed(
             receiptCID: envelope.receiptCID,
             jarID: envelope.jarID,
             sequenceNumber: envelope.sequenceNumber
         )
 
-        print("✅ Processed receipt: \(envelope.receiptCID) (seq=\(envelope.sequenceNumber))")
+        print("✅ [PROCESSED] jar=\(jarPrefix) seq=\(envelope.sequenceNumber)")
+
+        // ═══════════════════════════════════════════════════════════════
+        // STEP 8: TRY TO PROCESS QUEUED RECEIPTS
+        // Only when NOT skipGapDetection (prevents nested calls)
+        // ═══════════════════════════════════════════════════════════════
+
+        if !skipGapDetection {
+            try await processQueuedReceipts(jarID: envelope.jarID)
+        }
     }
 
     // MARK: - Verification
@@ -430,6 +624,391 @@ class JarSyncManager {
         }
     }
 
+    // MARK: - Queue Management (Module 4)
+
+    /**
+     * Queue a receipt that arrived out of order
+     *
+     * PRE-CONDITIONS:
+     * - Receipt has been verified (signature valid)
+     * - Gap was detected (seq > expected)
+     */
+    private func queueReceipt(_ envelope: RelayEnvelope) async throws {
+        try await db.writeAsync { db in
+            try db.execute(sql: """
+                INSERT OR REPLACE INTO jar_receipt_queue
+                (id, jar_id, receipt_cid, parent_cid, sequence_number, receipt_data, signature, sender_did, queued_at, retry_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            """, arguments: [
+                UUID().uuidString,
+                envelope.jarID,
+                envelope.receiptCID,
+                envelope.parentCID,
+                envelope.sequenceNumber,
+                envelope.receiptData,
+                envelope.signature,
+                envelope.senderDID,
+                Date().timeIntervalSince1970
+            ])
+        }
+
+        print("📥 [QUEUE] Queued seq=\(envelope.sequenceNumber) for jar \(String(envelope.jarID.prefix(8)))...")
+    }
+
+    /**
+     * Process queued receipts that now have dependencies satisfied
+     *
+     * ALGORITHM:
+     * 1. Get all queued receipts for this jar, sorted by sequence
+     * 2. For each receipt:
+     *    - seq < expected: ORPHANED (already processed via backfill) → remove
+     *    - seq == expected: READY → process and remove
+     *    - seq > expected: BLOCKED → stop and schedule backfill retry
+     * 3. On poison: HALT the jar (don't skip to next)
+     *
+     * CONCURRENCY: Uses actor guard to prevent concurrent queue processing
+     */
+    private func processQueuedReceipts(jarID: String) async throws {
+        let jarPrefix = String(jarID.prefix(8))
+
+        // Actor-safe guard: prevent concurrent queue processing
+        guard await syncState.tryStartQueueProcessing(jarID: jarID) else {
+            print("⏳ [QUEUE] Already processing for \(jarPrefix)...")
+            return
+        }
+        defer { Task { await syncState.finishQueueProcessing(jarID: jarID) } }
+
+        // Get queued receipts
+        let queued = try await getQueuedReceipts(jarID: jarID)
+        guard !queued.isEmpty else { return }
+
+        print("🔄 [QUEUE] Processing \(queued.count) queued receipts for \(jarPrefix)...")
+
+        // Sort by sequence (ascending) - CRITICAL
+        let sorted = queued.sorted { $0.sequenceNumber < $1.sequenceNumber }
+
+        // Track last processed sequence
+        var lastSeq = try await getLastSequence(jarID: jarID)
+
+        for queuedReceipt in sorted {
+            let expectedSeq = lastSeq + 1
+
+            // ─────────────────────────────────────────────────────────
+            // CHECK: Is receipt too old or too many retries?
+            // ─────────────────────────────────────────────────────────
+
+            let age = Date().timeIntervalSince1970 - queuedReceipt.queuedAt
+            if queuedReceipt.retryCount >= maxRetries || age > maxQueueAge {
+                let reason = queuedReceipt.retryCount >= maxRetries
+                    ? "exceeded \(maxRetries) retries"
+                    : "expired after \(Int(age / 86400)) days"
+
+                print("☠️ [POISON] seq=\(queuedReceipt.sequenceNumber): \(reason)")
+
+                // HALT the jar - poison breaks sequence invariant
+                try await haltJar(jarID: jarID, reason: "Poison receipt at seq=\(queuedReceipt.sequenceNumber): \(reason)")
+                return
+            }
+
+            // ─────────────────────────────────────────────────────────
+            // CASE A: seq < expected → ORPHANED (already processed)
+            // ─────────────────────────────────────────────────────────
+
+            if queuedReceipt.sequenceNumber < expectedSeq {
+                print("🧹 [ORPHAN] Removing seq=\(queuedReceipt.sequenceNumber) (expected \(expectedSeq))")
+                try await removeFromQueue(queuedReceipt.id)
+                continue
+            }
+
+            // ─────────────────────────────────────────────────────────
+            // CASE B: seq == expected → READY TO PROCESS
+            // ─────────────────────────────────────────────────────────
+
+            if queuedReceipt.sequenceNumber == expectedSeq {
+                print("✅ [DEQUEUE] Processing seq=\(queuedReceipt.sequenceNumber)")
+
+                // Reconstruct envelope
+                let envelope = RelayEnvelope(
+                    jarID: queuedReceipt.jarID,
+                    sequenceNumber: queuedReceipt.sequenceNumber,
+                    receiptCID: queuedReceipt.receiptCID,
+                    receiptData: queuedReceipt.receiptData,
+                    signature: queuedReceipt.signature,
+                    senderDID: queuedReceipt.senderDID,
+                    receivedAt: Int64(queuedReceipt.queuedAt * 1000),
+                    parentCID: queuedReceipt.parentCID
+                )
+
+                do {
+                    // Process with skipGapDetection=true (prevents nested queue calls)
+                    try await processEnvelope(envelope, skipGapDetection: true)
+
+                    // Remove from queue AFTER success
+                    try await removeFromQueue(queuedReceipt.id)
+
+                    // Update local tracking
+                    lastSeq = queuedReceipt.sequenceNumber
+
+                } catch {
+                    // Processing failed - increment retry and HALT
+                    print("❌ [POISON] Failed to process queued receipt: \(error)")
+                    try await incrementRetryCount(queuedReceipt.id)
+                    try await haltJar(jarID: jarID, reason: "Processing failed at seq=\(queuedReceipt.sequenceNumber): \(error.localizedDescription)")
+                    return
+                }
+
+                continue
+            }
+
+            // ─────────────────────────────────────────────────────────
+            // CASE C: seq > expected → STILL BLOCKED
+            // ─────────────────────────────────────────────────────────
+
+            print("⏸️ [BLOCKED] Waiting for seq=\(expectedSeq), have seq=\(queuedReceipt.sequenceNumber)")
+
+            // Schedule delayed backfill retry (not immediate)
+            try await scheduleBackfillRetry(
+                jarID: jarID,
+                from: expectedSeq,
+                to: queuedReceipt.sequenceNumber - 1
+            )
+
+            break  // Can't process rest of queue
+        }
+    }
+
+    /**
+     * Request missing receipts from relay (backfill)
+     *
+     * GUARDS:
+     * - Actor-safe: prevents overlapping requests (storm prevention)
+     * - Processes backfilled receipts with skipGapDetection=true
+     */
+    private func requestBackfill(jarID: String, from: Int, to: Int) async throws {
+        let jarPrefix = String(jarID.prefix(8))
+
+        // Actor-safe guard: prevent overlapping backfill requests
+        if await syncState.shouldSkipBackfill(jarID: jarID, from: from, to: to) {
+            print("⏳ [BACKFILL] Already in progress for \(jarPrefix)...")
+            return
+        }
+
+        await syncState.startBackfill(jarID: jarID, from: from, to: to)
+        defer { Task { await syncState.finishBackfill(jarID: jarID) } }
+
+        print("🔁 [BACKFILL] Requesting seq=\(from)-\(to) for \(jarPrefix)...")
+
+        // Fetch from relay
+        let envelopes: [RelayEnvelope]
+        do {
+            envelopes = try await RelayClient.shared.getJarReceipts(jarID: jarID, from: from, to: to)
+        } catch {
+            print("❌ [BACKFILL] Failed to fetch: \(error)")
+
+            // Schedule retry with backoff
+            try await scheduleBackfillRetry(jarID: jarID, from: from, to: to)
+            return
+        }
+
+        let requestedCount = to - from + 1
+        print("📬 [BACKFILL] Received \(envelopes.count)/\(requestedCount) receipts")
+
+        if envelopes.isEmpty {
+            print("⚠️ [BACKFILL] Relay returned no receipts - scheduling retry")
+            try await scheduleBackfillRetry(jarID: jarID, from: from, to: to)
+            return
+        }
+
+        // Process in sequence order (CRITICAL)
+        for envelope in envelopes.sorted(by: { $0.sequenceNumber < $1.sequenceNumber }) {
+            do {
+                try await processEnvelope(envelope, skipGapDetection: true)
+            } catch {
+                print("❌ [BACKFILL] Failed to process seq=\(envelope.sequenceNumber): \(error)")
+                // Don't halt here - the individual processEnvelope handles halting
+                break
+            }
+        }
+
+        // Check if incomplete (got fewer than requested)
+        if envelopes.count < requestedCount {
+            print("⚠️ [BACKFILL] Incomplete: \(envelopes.count)/\(requestedCount)")
+            // Queue processing will trigger retry for remaining gap
+        }
+    }
+
+    /**
+     * Schedule a delayed backfill retry with exponential backoff
+     */
+    private func scheduleBackfillRetry(jarID: String, from: Int, to: Int) async throws {
+        // Get current attempt count from jar_sync_state
+        let (attempt, _) = try await getBackfillState(jarID: jarID)
+        let nextAttempt = attempt + 1
+
+        // Calculate delay with exponential backoff
+        let delayIndex = min(nextAttempt - 1, backfillRetryDelays.count - 1)
+        let delay = backfillRetryDelays[delayIndex]
+        let nextRetryAt = Date().addingTimeInterval(delay)
+
+        // Save state
+        try await db.writeAsync { db in
+            try db.execute(sql: """
+                INSERT INTO jar_sync_state (jar_id, next_backfill_at, backfill_from, backfill_to, backfill_attempt)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(jar_id) DO UPDATE SET
+                    next_backfill_at = excluded.next_backfill_at,
+                    backfill_from = excluded.backfill_from,
+                    backfill_to = excluded.backfill_to,
+                    backfill_attempt = excluded.backfill_attempt
+            """, arguments: [jarID, nextRetryAt.timeIntervalSince1970, from, to, nextAttempt])
+        }
+
+        print("📅 [BACKFILL] Scheduled retry #\(nextAttempt) in \(Int(delay))s for \(String(jarID.prefix(8)))...")
+
+        // Schedule the actual retry
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+            // Check if we should still retry (not halted, not already succeeded)
+            guard !(try await isJarHalted(jarID)) else { return }
+
+            let (_, scheduledAt) = try await getBackfillState(jarID: jarID)
+            guard let scheduled = scheduledAt, scheduled <= Date() else { return }
+
+            print("🔄 [BACKFILL] Executing scheduled retry for \(String(jarID.prefix(8)))...")
+            try? await requestBackfill(jarID: jarID, from: from, to: to)
+        }
+    }
+
+    // MARK: - Jar Halt Management
+
+    /**
+     * Halt a jar - stops all processing until manual intervention
+     *
+     * CRITICAL: Poison handling halts, doesn't skip
+     * This maintains the sequence invariant
+     */
+    private func haltJar(jarID: String, reason: String) async throws {
+        print("🛑 [HALT] Halting jar \(String(jarID.prefix(8)))...: \(reason)")
+
+        try await db.writeAsync { db in
+            try db.execute(sql: """
+                INSERT INTO jar_sync_state (jar_id, is_halted, halt_reason, halted_at)
+                VALUES (?, 1, ?, ?)
+                ON CONFLICT(jar_id) DO UPDATE SET
+                    is_halted = 1,
+                    halt_reason = excluded.halt_reason,
+                    halted_at = excluded.halted_at
+            """, arguments: [jarID, reason, Date().timeIntervalSince1970])
+        }
+
+        // TODO: Post notification to UI about halted jar
+    }
+
+    /**
+     * Check if a jar is halted
+     */
+    func isJarHalted(_ jarID: String) async throws -> Bool {
+        try await db.readAsync { db in
+            let isHalted = try Int.fetchOne(
+                db,
+                sql: "SELECT is_halted FROM jar_sync_state WHERE jar_id = ?",
+                arguments: [jarID]
+            )
+            return isHalted == 1
+        }
+    }
+
+    /**
+     * Unhalt a jar - allows retrying after manual intervention
+     */
+    func unhaltJar(_ jarID: String) async throws {
+        print("▶️ [UNHALT] Unhalting jar \(String(jarID.prefix(8)))...")
+
+        try await db.writeAsync { db in
+            try db.execute(sql: """
+                UPDATE jar_sync_state
+                SET is_halted = 0, halt_reason = NULL, halted_at = NULL, backfill_attempt = 0
+                WHERE jar_id = ?
+            """, arguments: [jarID])
+        }
+    }
+
+    // MARK: - Helpers
+
+    /**
+     * Get last processed sequence for a jar
+     * Returns 0 if jar doesn't exist (expects seq=1 for jar.created)
+     */
+    func getLastSequence(jarID: String) async throws -> Int {
+        try await db.readAsync { db in
+            try Int.fetchOne(
+                db,
+                sql: "SELECT last_sequence_number FROM jars WHERE id = ?",
+                arguments: [jarID]
+            ) ?? 0
+        }
+    }
+
+    /**
+     * Get all queued receipts for a jar (excluding poisoned)
+     */
+    private func getQueuedReceipts(jarID: String) async throws -> [QueuedReceipt] {
+        try await db.readAsync { db in
+            try QueuedReceipt.fetchAll(db, sql: """
+                SELECT * FROM jar_receipt_queue
+                WHERE jar_id = ? AND poison_reason IS NULL
+                ORDER BY sequence_number ASC
+            """, arguments: [jarID])
+        }
+    }
+
+    /**
+     * Remove a receipt from the queue
+     */
+    private func removeFromQueue(_ queueID: String) async throws {
+        try await db.writeAsync { db in
+            try db.execute(
+                sql: "DELETE FROM jar_receipt_queue WHERE id = ?",
+                arguments: [queueID]
+            )
+        }
+    }
+
+    /**
+     * Increment retry count for a queued receipt
+     */
+    private func incrementRetryCount(_ queueID: String) async throws {
+        try await db.writeAsync { db in
+            try db.execute(sql: """
+                UPDATE jar_receipt_queue
+                SET retry_count = retry_count + 1, last_retry_at = ?
+                WHERE id = ?
+            """, arguments: [Date().timeIntervalSince1970, queueID])
+        }
+    }
+
+    /**
+     * Get backfill state for a jar
+     */
+    private func getBackfillState(jarID: String) async throws -> (attempt: Int, nextRetryAt: Date?) {
+        try await db.readAsync { db in
+            let row = try Row.fetchOne(db, sql: """
+                SELECT backfill_attempt, next_backfill_at FROM jar_sync_state WHERE jar_id = ?
+            """, arguments: [jarID])
+
+            let attempt = row?["backfill_attempt"] as? Int ?? 0
+            let nextRetryAt: Date?
+            if let timestamp = row?["next_backfill_at"] as? TimeInterval {
+                nextRetryAt = Date(timeIntervalSince1970: timestamp)
+            } else {
+                nextRetryAt = nil
+            }
+
+            return (attempt, nextRetryAt)
+        }
+    }
+
     // MARK: - CBOR Decoding Helpers
 
     /**
@@ -781,6 +1360,8 @@ enum SyncError: Error, LocalizedError {
     case notBudOwner(budUUID: String, deletedBy: String)
     case invalidCBORStructure(String)
     case missingField(String)
+    case jarHalted(jarID: String)
+    case backfillFailed(jarID: String, reason: String)
 
     var errorDescription: String? {
         switch self {
@@ -794,6 +1375,10 @@ enum SyncError: Error, LocalizedError {
             return "Invalid CBOR structure: \(msg)"
         case .missingField(let field):
             return "Missing required field: \(field)"
+        case .jarHalted(let jarID):
+            return "Jar \(jarID) is halted - requires manual intervention"
+        case .backfillFailed(let jarID, let reason):
+            return "Backfill failed for jar \(jarID): \(reason)"
         }
     }
 }
