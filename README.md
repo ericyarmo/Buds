@@ -8,14 +8,14 @@ Built on receipt-first, local-first, privacy-by-default principles.
 
 ## Project Status
 
-**Current Build:** ✅ Phase 10.3 Module 2 Complete | Relay Envelope Architecture ✅
-**Date:** January 3, 2026
+**Current Build:** ✅ Phase 10.3 Module 3 Complete | Core Sync Engine ✅
+**Date:** January 4, 2026
 **Version:** 1.0.0 (Beta)
 **Bundle ID:** `app.getbuds.buds`
 
-**Latest Milestone:** Phase 10.3 Module 2 Complete - Database Migration v8 (Jar Receipt Tables) ✅
-**Status:** Relay envelope architecture implemented, distributed systems in progress
-**Next Up:** Module 3 (Tombstones + Replay Protection) → Module 4 (Dependency Resolution)
+**Latest Milestone:** Phase 10.3 Module 3 Complete - Receipt Processing Pipeline ✅
+**Status:** Core sync engine implemented, gap detection + queueing next
+**Next Up:** Module 4 (Gap Detection & Queueing) → Module 5 (Jar Creation with Sync)
 **Goal:** Complete distributed jar sync → TestFlight beta (20-50 users)
 
 ---
@@ -116,16 +116,20 @@ Built on receipt-first, local-first, privacy-by-default principles.
 - Added columns to jars: last_sequence_number, parent_cid
 - Stores relay-assigned sequences (not client-generated)
 
+**Module 3: Receipt Processing Pipeline (4-5h) ✅**
+- JarSyncManager: Core sync engine (~800 lines)
+- JarTombstoneRepository: Deletion safety (~110 lines)
+- 5-step processing pipeline: replay protection, tombstone check, verify, apply, mark
+- 9 receipt handlers: jar.created, member_added, bud_shared, bud_deleted, jar_deleted, etc.
+- CBOR decoding for all receipt types
+- Deletion semantics: bud deletion propagates, jar deletion creates tombstone
+- Module 1 extension: Added jar.bud_shared + jar.bud_deleted receipt types
+
 ### 🔜 Next Modules (Week 2)
 
-**Module 3: Tombstone & Replay Protection (2-3h)**
-- JarTombstoneRepository for deletion safety
-- Replay protection (check processed_jar_receipts)
-- Check tombstone before processing receipts
-
-**Module 4: Dependency Resolution & Queueing (4-5h)**
-- JarSyncManager for receipt processing
-- Sequence gap detection + backfill
+**Module 4: Gap Detection & Queueing (4-5h)**
+- Extend JarSyncManager with gap detection
+- Sequence gap detection + backfill requests
 - Queue out-of-order receipts
 - Process queue when dependencies satisfied
 
@@ -388,21 +392,21 @@ All planning docs organized in `docs/` folder:
 
 ## Roadmap
 
-**Current Focus:** Phase 10.3 - Crypto + Distributed Systems Hardening (~28-38 hours remaining)
+**Current Focus:** Phase 10.3 - Crypto + Distributed Systems Hardening (~24-33 hours remaining)
 
-**Completed (Modules 0.1-2):**
+**Completed (Modules 0.1-3):**
 - ✅ Module 0.1: CBOR pinning
 - ✅ Module 0.2: Phone-based identity
 - ✅ Module 0.3: Deterministic phone encryption
 - ✅ Module 0.4: Dynamic device discovery
 - ✅ Module 0.5: Safety number UI
 - ✅ Module 0.6: Relay infrastructure (relay envelope architecture)
-- ✅ Module 1: Receipt types & relay integration
-- ✅ Module 2: Database migration v8
+- ✅ Module 1: Receipt types & relay integration (9 receipt types + bud deletion)
+- ✅ Module 2: Database migration v8 (jar receipt tables)
+- ✅ Module 3: Receipt processing pipeline (core sync engine, 9 handlers, tombstones)
 
-**In Progress (Modules 3-10):**
-- 🔜 Module 3: Tombstones + replay protection (2-3h)
-- 🔜 Module 4: Dependency resolution & queueing (4-5h)
+**In Progress (Modules 4-10):**
+- 🔜 Module 4: Gap detection & queueing (4-5h)
 - 🔜 Module 5: Jar creation with sync (2-3h)
 - 🔜 Module 6: Member invite flow (4-5h)
 - 🔜 Module 7: Bud sharing with jar_id (2-3h)
@@ -432,13 +436,13 @@ Private project. Architecture by Claude (Anthropic) + Eric.
 
 ## Build Progress Tracker
 
-**Last Updated:** January 3, 2026
-**Current Phase:** Phase 10.3 Module 2 Complete ✅
-**Latest Commit:** Phase 10.3 Module 2 - Database Migration v8 (Jar Receipt Tables)
+**Last Updated:** January 4, 2026
+**Current Phase:** Phase 10.3 Module 3 Complete ✅
+**Latest Commit:** Phase 10.3 Module 3 - Receipt Processing Pipeline
 
-**Status:** Relay envelope architecture implemented (Modules 0.1-2 complete, 8 modules remaining)
-**Next Session:** Module 3 (Tombstone & Replay Protection)
-**Estimated Time to Beta:** 28-38 hours remaining
+**Status:** Core sync engine implemented (Modules 0.1-3 complete, 7 modules remaining)
+**Next Session:** Module 4 (Gap Detection & Queueing)
+**Estimated Time to Beta:** 24-33 hours remaining
 
 ---
 
