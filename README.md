@@ -8,14 +8,14 @@ Built on receipt-first, local-first, privacy-by-default principles.
 
 ## Project Status
 
-**Current Build:** ✅ Phase 10.3 Module 3 Complete | Core Sync Engine ✅
-**Date:** January 4, 2026
+**Current Build:** ✅ Phase 10.3 Module 6 Complete | Member Invite Flow ✅
+**Date:** January 5, 2026
 **Version:** 1.0.0 (Beta)
 **Bundle ID:** `app.getbuds.buds`
 
-**Latest Milestone:** Phase 10.3 Module 3 Complete - Receipt Processing Pipeline ✅
-**Status:** Core sync engine implemented, gap detection + queueing next
-**Next Up:** Module 4 (Gap Detection & Queueing) → Module 5 (Jar Creation with Sync)
+**Latest Milestone:** Phase 10.3 Module 6 Complete - Member Invite Flow ✅
+**Status:** Jar sync loop + member invites complete, bud sharing next
+**Next Up:** Module 7 (Bud Sharing with jar_id) → TestFlight Multi-Device Testing
 **Goal:** Complete distributed jar sync → TestFlight beta (20-50 users)
 
 ---
@@ -125,21 +125,46 @@ Built on receipt-first, local-first, privacy-by-default principles.
 - Deletion semantics: bud deletion propagates, jar deletion creates tombstone
 - Module 1 extension: Added jar.bud_shared + jar.bud_deleted receipt types
 
+**Module 4: Gap Detection & Queueing (4-5h) ✅**
+- Sequence gap detection with intelligent queueing
+- Backfill requests for missing receipts
+- Queue out-of-order receipts (jar_receipt_queue table)
+- Process queue when dependencies satisfied
+- Poison receipt detection (max retries, age limits)
+- Halts jar on corruption/poison (prevents infinite loops)
+
+**Module 5a: Jar Sync Loop (3-4h) ✅**
+- InboxManager polls jar receipts every 30s (extends existing bud polling)
+- JarSyncManager.getSyncTargets() - returns [(jarID, lastSeq, isHalted)]
+- 2-layer deduplication: in-memory by sequence, DB by CID
+- Sequence+CID mismatch detection (corruption halts jar)
+- 403 handling (halts jar, stops polling spam)
+
+**Module 5b: Jar Creation with Sync (2-3h) ✅**
+- Generate jar.created receipt WITHOUT sequence
+- Send to relay → relay assigns sequence + CID
+- Assert local CID == relay CID (corruption detection)
+- Update jar.lastSequenceNumber + parentCID
+- Local-first: jars work offline until sync succeeds
+
+**Module 6: Member Invite Flow (4-5h) ✅**
+- JarManager.addMember() generates jar.member_added receipt
+- Includes device list in receipt payload (TOFU key pinning)
+- All jar members pin invitee's devices on receipt processing
+- JarManager.acceptInvite() generates jar.invite_accepted receipt
+- Fixed applyMemberAdded() SQL schema mismatch (pubkey_x25519, created_at, etc.)
+- Device broadcast prevents E2EE breakage across jar members
+
 ### 🔜 Next Modules (Week 2)
 
-**Module 4: Gap Detection & Queueing (4-5h)**
-- Extend JarSyncManager with gap detection
-- Sequence gap detection + backfill requests
-- Queue out-of-order receipts
-- Process queue when dependencies satisfied
+**Module 7: Bud Sharing with jar_id (2-3h)** ← **NEXT**
+- Update ReceiptManager to include jar_id in bud receipts
+- ShareManager validates jar membership before sharing
+- Process incoming buds: route to correct jar
+- UI: Share bud to specific jar (picker)
 
-**Module 5: Jar Creation with Sync (2-3h)**
-- Generate jar.created receipt WITHOUT sequence
-- Send to relay → store relay-assigned sequence
-- Process jar.created on receive
-
-**Module 6-10: Jar Sync Flows (12-16h)**
-- Member invite flow, bud sharing, offline hardening, UI, polish
+**Module 8-10: Final Hardening (8-11h)**
+- Offline hardening, UI components, notifications & polish
 
 ### Architecture Changes (Phase 10.3)
 
@@ -394,7 +419,7 @@ All planning docs organized in `docs/` folder:
 
 **Current Focus:** Phase 10.3 - Crypto + Distributed Systems Hardening (~24-33 hours remaining)
 
-**Completed (Modules 0.1-3):**
+**Completed (Modules 0.1-6):**
 - ✅ Module 0.1: CBOR pinning
 - ✅ Module 0.2: Phone-based identity
 - ✅ Module 0.3: Deterministic phone encryption
@@ -404,12 +429,13 @@ All planning docs organized in `docs/` folder:
 - ✅ Module 1: Receipt types & relay integration (9 receipt types + bud deletion)
 - ✅ Module 2: Database migration v8 (jar receipt tables)
 - ✅ Module 3: Receipt processing pipeline (core sync engine, 9 handlers, tombstones)
+- ✅ Module 4: Gap detection & queueing (sequence gaps, backfill, poison detection)
+- ✅ Module 5a: Jar sync loop (30s polling, 2-layer dedupe, corruption detection)
+- ✅ Module 5b: Jar creation with sync (receipt generation, CID validation)
+- ✅ Module 6: Member invite flow (device broadcast, TOFU pinning, invite acceptance)
 
-**In Progress (Modules 4-10):**
-- 🔜 Module 4: Gap detection & queueing (4-5h)
-- 🔜 Module 5: Jar creation with sync (2-3h)
-- 🔜 Module 6: Member invite flow (4-5h)
-- 🔜 Module 7: Bud sharing with jar_id (2-3h)
+**In Progress (Modules 7-10):**
+- 🔄 Module 7: Bud sharing with jar_id (2-3h) ← **CURRENT**
 - 🔜 Module 8: Offline hardening (3-4h)
 - 🔜 Module 9: UI components (3-4h)
 - 🔜 Module 10: Notifications & polish (2-3h)
@@ -436,13 +462,13 @@ Private project. Architecture by Claude (Anthropic) + Eric.
 
 ## Build Progress Tracker
 
-**Last Updated:** January 4, 2026
-**Current Phase:** Phase 10.3 Module 3 Complete ✅
-**Latest Commit:** Phase 10.3 Module 3 - Receipt Processing Pipeline
+**Last Updated:** January 5, 2026
+**Current Phase:** Phase 10.3 Module 6 Complete ✅
+**Latest Commit:** Phase 10.3 Module 6 - Member Invite Flow
 
-**Status:** Core sync engine implemented (Modules 0.1-3 complete, 7 modules remaining)
-**Next Session:** Module 4 (Gap Detection & Queueing)
-**Estimated Time to Beta:** 24-33 hours remaining
+**Status:** Jar sync complete! (Modules 0.1-6 done, 4 modules remaining)
+**Next Session:** Module 7 (Bud Sharing with jar_id) + Multi-Device TestFlight Testing
+**Estimated Time to Beta:** 10-14 hours remaining
 
 ---
 
