@@ -46,35 +46,127 @@ actor InboxManager {
         defer { isPolling = false }
 
         do {
+            // ═══════════════════════════════════════════════════════
+            // EXISTING: Poll bud receipts (keep unchanged)
+            // ═══════════════════════════════════════════════════════
+
             // Get authenticated user's DID
             let did = try await IdentityManager.shared.currentDID
 
             // Fetch messages from relay
             let messages = try await RelayClient.shared.getInbox(for: did)
 
-            guard !messages.isEmpty else {
-                print("📭 Inbox empty")
-                return
-            }
+            if !messages.isEmpty {
+                print("📬 Received \(messages.count) messages")
 
-            print("📬 Received \(messages.count) messages")
+                // Decrypt and store each message
+                for message in messages {
+                    do {
+                        try await processMessage(message)
+                    } catch {
+                        print("❌ Failed to process message \(message.messageId): \(error)")
+                    }
+                }
 
-            // Decrypt and store each message
-            for message in messages {
-                do {
-                    try await processMessage(message)
-                } catch {
-                    print("❌ Failed to process message \(message.messageId): \(error)")
+                // Notify UI to refresh
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .inboxUpdated, object: nil)
                 }
             }
 
-            // Notify UI to refresh
-            await MainActor.run {
-                NotificationCenter.default.post(name: .inboxUpdated, object: nil)
-            }
+            // ═══════════════════════════════════════════════════════
+            // NEW: Poll jar receipts (Module 5a)
+            // ═══════════════════════════════════════════════════════
+
+            await pollJarReceipts()
 
         } catch {
             print("❌ Inbox poll failed: \(error)")
+        }
+    }
+
+    // MARK: - Jar Polling (Module 5a)
+
+    /// Poll jar receipts for all active jars
+    private func pollJarReceipts() async {
+        do {
+            // Get sync targets from JarSyncManager (clean interface)
+            let targets = try await JarSyncManager.shared.getSyncTargets()
+
+            guard !targets.isEmpty else {
+                print("📭 No active jars to sync")
+                return
+            }
+
+            print("📡 [JAR_SYNC] Polling \(targets.count) active jars...")
+
+            // Poll each jar independently
+            for target in targets {
+                do {
+                    try await pollJar(target)
+                } catch {
+                    let jarPrefix = String(target.jarID.prefix(8))
+                    print("❌ [JAR_SYNC] Failed to poll jar \(jarPrefix)...: \(error)")
+                    // Continue polling other jars (isolation)
+                }
+            }
+
+        } catch {
+            print("❌ [JAR_SYNC] Failed to get sync targets: \(error)")
+        }
+    }
+
+    /// Poll receipts for a single jar
+    private func pollJar(_ target: JarSyncTarget) async throws {
+        let jarPrefix = String(target.jarID.prefix(8))
+
+        // CRITICAL FIX 3: Skip halted jars (avoid spam during backfill)
+        guard !target.isHalted else {
+            print("⏸️  [JAR_SYNC] Skipping halted jar \(jarPrefix)...")
+            return
+        }
+
+        print("📡 [JAR_SYNC] Polling jar \(jarPrefix)... (after seq=\(target.lastSequenceNumber))")
+
+        // Fetch new receipts from relay (using ?after= API)
+        let envelopes: [RelayEnvelope]
+        do {
+            envelopes = try await RelayClient.shared.getJarReceipts(
+                jarID: target.jarID,
+                after: target.lastSequenceNumber,
+                limit: 100
+            )
+        } catch let error as RelayError {
+            // CRITICAL FIX 3: Handle 403 gracefully (don't spam every 30s)
+            if case .httpError(let statusCode, _) = error, statusCode == 403 {
+                print("🚫 [JAR_SYNC] Not a member of jar \(jarPrefix), halting polling")
+                // Mark jar as halted due to membership revocation
+                try await JarSyncManager.shared.haltJar(
+                    jarID: target.jarID,
+                    reason: "Not a member (HTTP 403)"
+                )
+                return
+            }
+            throw error
+        }
+
+        guard !envelopes.isEmpty else {
+            print("📭 [JAR_SYNC] No new receipts for \(jarPrefix)")
+            return
+        }
+
+        print("📬 [JAR_SYNC] Received \(envelopes.count) receipts for \(jarPrefix)")
+
+        // Process batch (JarSyncManager handles sorting, deduping, gap detection)
+        try await JarSyncManager.shared.processEnvelopes(for: target.jarID, envelopes)
+
+        // Notify UI to refresh jar
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: .jarUpdated,
+                object: nil,
+                userInfo: ["jar_id": target.jarID]
+            )
         }
     }
 
@@ -249,6 +341,7 @@ actor InboxManager {
 extension Notification.Name {
     static let inboxUpdated = Notification.Name("inboxUpdated")
     static let newDeviceDetected = Notification.Name("newDeviceDetected")  // Phase 10.3 Module 0.4
+    static let jarUpdated = Notification.Name("jarUpdated")                // Phase 10.3 Module 5a
 }
 
 // MARK: - Errors

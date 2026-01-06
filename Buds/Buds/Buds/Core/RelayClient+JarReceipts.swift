@@ -127,6 +127,19 @@ extension RelayClient {
             throw RelayError.invalidResponse
         }
 
+        // Handle errors gracefully (Module 5a)
+        if httpResponse.statusCode == 404 {
+            // Jar not found (might be deleted or never created on relay)
+            print("⚠️  [RELAY] Jar \(String(jarID.prefix(8)))... not found on relay (404)")
+            return []
+        }
+
+        if httpResponse.statusCode == 403 {
+            // Not a member (removed from jar)
+            print("⚠️  [RELAY] Not a member of jar \(String(jarID.prefix(8)))... (403)")
+            throw RelayError.httpError(statusCode: 403, message: "Not a member of this jar")
+        }
+
         guard httpResponse.statusCode == 200 else {
             let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw RelayError.httpError(statusCode: httpResponse.statusCode, message: errorMessage)

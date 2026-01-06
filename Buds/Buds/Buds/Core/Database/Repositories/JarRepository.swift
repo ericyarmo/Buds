@@ -66,6 +66,53 @@ final class JarRepository {
         return jar
     }
 
+    // Phase 10.3 Module 5b: Create jar with explicit ID and sync state
+    func createJar(
+        id: String,
+        name: String,
+        description: String?,
+        ownerDID: String,
+        lastSequenceNumber: Int,
+        parentCID: String?
+    ) async throws -> Jar {
+        let jar = Jar(
+            id: id,
+            name: name,
+            description: description,
+            ownerDID: ownerDID,
+            createdAt: Date(),
+            updatedAt: Date(),
+            lastSequenceNumber: lastSequenceNumber,
+            parentCID: parentCID
+        )
+
+        try await Database.shared.writeAsync { db in
+            try jar.insert(db)
+        }
+
+        return jar
+    }
+
+    func updateLastSequence(_ jarID: String, _ sequenceNumber: Int) async throws {
+        try await Database.shared.writeAsync { db in
+            try db.execute(sql: """
+                UPDATE jars
+                SET last_sequence_number = ?
+                WHERE id = ?
+            """, arguments: [sequenceNumber, jarID])
+        }
+    }
+
+    func updateParentCID(_ jarID: String, _ parentCID: String) async throws {
+        try await Database.shared.writeAsync { db in
+            try db.execute(sql: """
+                UPDATE jars
+                SET parent_cid = ?
+                WHERE id = ?
+            """, arguments: [parentCID, jarID])
+        }
+    }
+
     // Phase 10.1 Module 2.1: Update jar metadata
     func updateJar(jarID: String, name: String, description: String?) async throws {
         try await Database.shared.writeAsync { db in

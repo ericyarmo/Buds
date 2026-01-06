@@ -142,15 +142,27 @@ enum ReceiptCanonicalizer {
     }
 
     /// Encode JarMemberAddedPayload to canonical CBOR map
+    /// Module 6: Includes device list for TOFU key pinning
     static func encodeJarMemberAddedPayload(_ payload: JarMemberAddedPayload) throws -> Data {
         let enc = CBORCanonical()
 
+        // Encode devices array (sorted by deviceId for canonical ordering)
+        let sortedDevices = payload.memberDevices.sorted { $0.deviceId < $1.deviceId }
+        let devicesArray: [CBORValue] = sortedDevices.map { device in
+            .map([
+                (.text("device_id"), .text(device.deviceId)),
+                (.text("pubkey_ed25519"), .text(device.pubkeyEd25519)),
+                (.text("pubkey_x25519"), .text(device.pubkeyX25519))
+            ])
+        }
+
         let pairs: [(CBORValue, CBORValue)] = [
+            (.text("added_at_ms"), .int(payload.addedAtMs)),
+            (.text("added_by_did"), .text(payload.addedByDID)),
+            (.text("member_devices"), .array(devicesArray)),
             (.text("member_did"), .text(payload.memberDID)),
             (.text("member_display_name"), .text(payload.memberDisplayName)),
-            (.text("member_phone_number"), .text(payload.memberPhoneNumber)),
-            (.text("added_by_did"), .text(payload.addedByDID)),
-            (.text("added_at_ms"), .int(payload.addedAtMs))
+            (.text("member_phone_number"), .text(payload.memberPhoneNumber))
         ]
 
         return try enc.encode(.map(pairs))
@@ -503,5 +515,64 @@ enum ReceiptCanonicalizer {
             memoryID: memoryID,
             reactionType: reactionType
         )
+    }
+
+    // MARK: - Jar Receipt Encoding (Phase 10.3 Module 5b)
+
+    /**
+     * Encode jar receipt envelope (outer layer)
+     *
+     * Contains: jar_id, receipt_type, sender_did, timestamp, parent_cid, payload
+     * Does NOT contain: sequence_number (relay assigns)
+     */
+    static func encodeJarReceiptPayload(
+        jarID: String,
+        receiptType: String,
+        senderDID: String,
+        timestamp: Int64,
+        parentCID: String?,
+        payload: Data
+    ) throws -> Data {
+        let enc = CBORCanonical()
+
+        var pairs: [(CBORValue, CBORValue)] = [
+            (.text("jar_id"), .text(jarID)),
+            (.text("payload"), .bytes(payload)),
+            (.text("receipt_type"), .text(receiptType)),
+            (.text("sender_did"), .text(senderDID)),
+            (.text("timestamp"), .int(timestamp))
+        ]
+
+        // Add parent_cid if present (must maintain sorted order)
+        if let parentCID = parentCID {
+            pairs.insert((.text("parent_cid"), .text(parentCID)), at: 1)  // Insert in sorted position
+        }
+
+        return try enc.encode(.map(pairs))
+    }
+
+    /**
+     * Encode jar.created payload (inner layer)
+     */
+    static func encodeJarCreatedPayload(
+        jarName: String,
+        jarDescription: String?,
+        ownerDID: String,
+        createdAtMs: Int64
+    ) throws -> Data {
+        let enc = CBORCanonical()
+
+        var pairs: [(CBORValue, CBORValue)] = [
+            (.text("created_at_ms"), .int(createdAtMs)),
+            (.text("jar_name"), .text(jarName)),
+            (.text("owner_did"), .text(ownerDID))
+        ]
+
+        // Add jar_description if present (must maintain sorted order)
+        if let desc = jarDescription {
+            pairs.insert((.text("jar_description"), .text(desc)), at: 2)  // Insert in sorted position
+        }
+
+        return try enc.encode(.map(pairs))
     }
 }

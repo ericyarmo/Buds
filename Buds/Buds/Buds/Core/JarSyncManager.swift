@@ -392,30 +392,69 @@ class JarSyncManager {
 
     /**
      * jar.member_added - Add member to jar
+     * Module 6: Includes TOFU device pinning for all jar members
      */
     func applyMemberAdded(_ envelope: RelayEnvelope) async throws {
         let payload = try decodeJarMemberAddedPayload(envelope.receiptData)
 
         print("👤 Adding member: \(payload.memberDisplayName) to jar \(envelope.jarID)")
 
-        // Add member (status: pending, awaiting invite_accepted)
+        // STEP 1: Pin ALL devices for this member (TOFU key pinning)
+        // CRITICAL: This allows all jar members to encrypt messages to invitee
+        for device in payload.memberDevices {
+            try await db.writeAsync { db in
+                // Check if device already exists
+                let exists = try Device
+                    .filter(Device.Columns.deviceId == device.deviceId)
+                    .fetchCount(db) > 0
+
+                if !exists {
+                    let deviceRecord = Device(
+                        deviceId: device.deviceId,
+                        ownerDID: payload.memberDID,
+                        deviceName: "Unknown",  // We don't have device name in receipt
+                        pubkeyX25519: device.pubkeyX25519,
+                        pubkeyEd25519: device.pubkeyEd25519,
+                        status: .active,
+                        registeredAt: Date(),
+                        lastSeenAt: nil
+                    )
+                    try deviceRecord.insert(db)
+                    print("🔐 Pinned device \(device.deviceId) for \(payload.memberDID)")
+                }
+            }
+        }
+
+        // STEP 2: Get first device's X25519 key for jar_members table
+        guard let firstDevice = payload.memberDevices.first else {
+            throw SyncError.missingField("member_devices (empty array)")
+        }
+
+        // STEP 3: Add member to jar_members (status: pending, awaiting invite_accepted)
+        // CRITICAL FIX: Use correct column names matching jar_members schema
         try await db.writeAsync { db in
             try db.execute(sql: """
-                INSERT OR REPLACE INTO jar_members (jar_id, did, display_name, phone_number, role, status, added_at, added_by_did)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO jar_members
+                (jar_id, member_did, display_name, phone_number, pubkey_x25519, avatar_cid,
+                 role, status, joined_at, invited_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, arguments: [
                 envelope.jarID,
                 payload.memberDID,
                 payload.memberDisplayName,
                 payload.memberPhoneNumber,
+                firstDevice.pubkeyX25519,  // Use first device's key
+                nil,                       // avatar_cid
                 "member",
                 "pending",
-                payload.addedAtMs / 1000,
-                payload.addedByDID
+                nil,                       // joined_at (set when invite accepted)
+                payload.addedAtMs / 1000,  // invited_at
+                Date().timeIntervalSince1970,
+                Date().timeIntervalSince1970
             ])
         }
 
-        print("✅ Member added: \(payload.memberDisplayName) (pending)")
+        print("✅ Member added: \(payload.memberDisplayName) (\(payload.memberDevices.count) devices pinned, status=pending)")
     }
 
     /**
@@ -887,8 +926,10 @@ class JarSyncManager {
      *
      * CRITICAL: Poison handling halts, doesn't skip
      * This maintains the sequence invariant
+     *
+     * NOTE: Internal visibility for InboxManager (Module 5a) to halt on 403
      */
-    private func haltJar(jarID: String, reason: String) async throws {
+    func haltJar(jarID: String, reason: String) async throws {
         print("🛑 [HALT] Halting jar \(String(jarID.prefix(8)))...: \(reason)")
 
         try await db.writeAsync { db in
@@ -1006,6 +1047,120 @@ class JarSyncManager {
             }
 
             return (attempt, nextRetryAt)
+        }
+    }
+
+    // MARK: - Sync Interface (Module 5a)
+
+    /**
+     * Get jars that need syncing
+     *
+     * Returns array of (jarID, lastSeq, isHalted) for InboxManager to poll
+     *
+     * INVARIANT: JarSyncManager owns all writes to jars.last_sequence_number
+     * InboxManager only reads via this interface.
+     */
+    func getSyncTargets() async throws -> [JarSyncTarget] {
+        try await db.readAsync { db in
+            // Fetch all active jars (not tombstoned)
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT j.id, j.last_sequence_number, COALESCE(s.is_halted, 0) AS is_halted
+                FROM jars j
+                LEFT JOIN jar_sync_state s ON j.id = s.jar_id
+                WHERE j.id NOT IN (SELECT jar_id FROM jar_tombstones)
+                ORDER BY j.created_at DESC
+            """)
+
+            return rows.map { row in
+                JarSyncTarget(
+                    jarID: row["id"] as! String,
+                    lastSequenceNumber: Int(row["last_sequence_number"] as? Int64 ?? 0),
+                    isHalted: (row["is_halted"] as? Int64 ?? 0) == 1
+                )
+            }
+        }
+    }
+
+    /**
+     * Process batch of envelopes for a jar
+     *
+     * Handles:
+     * - Sorting by sequence (ascending)
+     * - In-memory deduplication by sequenceNumber (pagination bugs)
+     * - DB replay protection by receiptCID
+     * - Routing to processEnvelope()
+     *
+     * CRITICAL: Envelopes from relay might be out-of-order or contain duplicates.
+     * We MUST sort + dedupe before processing to avoid unnecessary gap detection.
+     */
+    func processEnvelopes(for jarID: String, _ envelopes: [RelayEnvelope]) async throws {
+        guard !envelopes.isEmpty else { return }
+
+        let jarPrefix = String(jarID.prefix(8))
+        print("📦 [BATCH] Processing \(envelopes.count) envelopes for \(jarPrefix)...")
+
+        // CRITICAL FIX 1a: Sort by sequence (ascending)
+        let sorted = envelopes.sorted { $0.sequenceNumber < $1.sequenceNumber }
+
+        // CRITICAL FIX 1b: In-memory dedupe by sequenceNumber (keep first occurrence)
+        // Handles pagination bugs where relay returns seq=3 twice
+        var seenSequences: Set<Int> = []
+        let deduped = sorted.filter { envelope in
+            if seenSequences.contains(envelope.sequenceNumber) {
+                print("⚠️  [BATCH] Duplicate seq=\(envelope.sequenceNumber), skipping")
+                return false
+            }
+            seenSequences.insert(envelope.sequenceNumber)
+            return true
+        }
+
+        // Process each envelope with DB replay protection
+        var processed = 0
+        var skipped = 0
+
+        for envelope in deduped {
+            // CRITICAL FIX 2: Check DB for (jarID, seq, CID) consistency
+            if let existingCID = try await getProcessedReceiptCID(jarID: jarID, sequenceNumber: envelope.sequenceNumber) {
+                if existingCID != envelope.receiptCID {
+                    // CORRUPTION: Same sequence with different CID
+                    print("🚨 [CORRUPTION] jar=\(jarPrefix) seq=\(envelope.sequenceNumber) CID mismatch!")
+                    print("🚨   Expected: \(existingCID)")
+                    print("🚨   Got:      \(envelope.receiptCID)")
+                    try await haltJar(jarID: jarID, reason: "Sequence \(envelope.sequenceNumber) CID mismatch (corruption detected)")
+                    throw SyncError.sequenceCIDMismatch(jarID: jarID, sequence: envelope.sequenceNumber)
+                }
+                // Same CID, already processed (replay)
+                skipped += 1
+                continue
+            }
+
+            // Process envelope (gap detection, verification, apply)
+            do {
+                try await processEnvelope(envelope)
+                processed += 1
+            } catch {
+                print("❌ [BATCH] Failed to process seq=\(envelope.sequenceNumber): \(error)")
+                // Continue processing rest (don't let one failure stop the batch)
+                // Individual failures are handled by processEnvelope (halting, etc.)
+            }
+        }
+
+        print("✅ [BATCH] Processed \(processed)/\(deduped.count) (\(skipped) skipped)")
+    }
+
+    /**
+     * Get CID of already-processed receipt for (jarID, sequence)
+     *
+     * Returns:
+     * - nil if not processed
+     * - CID if processed (for mismatch detection)
+     */
+    private func getProcessedReceiptCID(jarID: String, sequenceNumber: Int) async throws -> String? {
+        try await db.readAsync { db in
+            try String.fetchOne(db, sql: """
+                SELECT receipt_cid FROM processed_jar_receipts
+                WHERE jar_id = ? AND sequence_number = ?
+            """, arguments: [jarID, sequenceNumber])
         }
     }
 
@@ -1127,15 +1282,43 @@ class JarSyncManager {
         guard case .text(let memberDID) = fields["member_did"],
               case .text(let memberDisplayName) = fields["member_display_name"],
               case .text(let memberPhoneNumber) = fields["member_phone_number"],
+              case .array(let devicesArray) = fields["member_devices"],
               case .text(let addedByDID) = fields["added_by_did"],
               case .int(let addedAtMs) = fields["added_at_ms"] else {
             throw SyncError.missingField("member_added fields")
+        }
+
+        // Parse devices array
+        var devices: [DeviceInfo] = []
+        for deviceValue in devicesArray {
+            guard case .map(let devicePairs) = deviceValue else {
+                throw SyncError.invalidCBORStructure("Expected device map")
+            }
+
+            var deviceFields: [String: CBORValue] = [:]
+            for (key, val) in devicePairs {
+                guard case .text(let keyStr) = key else { continue }
+                deviceFields[keyStr] = val
+            }
+
+            guard case .text(let deviceId) = deviceFields["device_id"],
+                  case .text(let pubkeyEd25519) = deviceFields["pubkey_ed25519"],
+                  case .text(let pubkeyX25519) = deviceFields["pubkey_x25519"] else {
+                throw SyncError.missingField("device fields")
+            }
+
+            devices.append(DeviceInfo(
+                deviceId: deviceId,
+                pubkeyEd25519: pubkeyEd25519,
+                pubkeyX25519: pubkeyX25519
+            ))
         }
 
         return JarMemberAddedPayload(
             memberDID: memberDID,
             memberDisplayName: memberDisplayName,
             memberPhoneNumber: memberPhoneNumber,
+            memberDevices: devices,
             addedByDID: addedByDID,
             addedAtMs: addedAtMs
         )
@@ -1352,6 +1535,19 @@ class JarSyncManager {
     }
 }
 
+// MARK: - Models
+
+/**
+ * Jar sync target (Module 5a)
+ *
+ * Used by InboxManager to poll jars without knowing DB schema
+ */
+struct JarSyncTarget {
+    let jarID: String
+    let lastSequenceNumber: Int
+    let isHalted: Bool
+}
+
 // MARK: - Errors
 
 enum SyncError: Error, LocalizedError {
@@ -1362,6 +1558,7 @@ enum SyncError: Error, LocalizedError {
     case missingField(String)
     case jarHalted(jarID: String)
     case backfillFailed(jarID: String, reason: String)
+    case sequenceCIDMismatch(jarID: String, sequence: Int)  // Module 5a: Corruption detection
 
     var errorDescription: String? {
         switch self {
@@ -1379,6 +1576,8 @@ enum SyncError: Error, LocalizedError {
             return "Jar \(jarID) is halted - requires manual intervention"
         case .backfillFailed(let jarID, let reason):
             return "Backfill failed for jar \(jarID): \(reason)"
+        case .sequenceCIDMismatch(let jarID, let sequence):
+            return "Sequence \(sequence) CID mismatch for jar \(jarID) - corruption detected"
         }
     }
 }

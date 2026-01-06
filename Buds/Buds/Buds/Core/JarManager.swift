@@ -82,17 +82,81 @@ class JarManager: ObservableObject {
     }
 
     func createJar(name: String, description: String? = nil) async throws -> Jar {
-        let currentDID = try await IdentityManager.shared.currentDID
+        print("🆕 [Module 5b] Creating jar: \(name)")
 
+        let ownerDID = try await IdentityManager.shared.currentDID
+        let jarID = UUID().uuidString
+
+        // 1. Create jar locally (optimistic - before relay confirms)
         let jar = try await JarRepository.shared.createJar(
+            id: jarID,
             name: name,
             description: description,
-            ownerDID: currentDID
+            ownerDID: ownerDID,
+            lastSequenceNumber: 0,  // Will be updated after relay assigns
+            parentCID: nil          // Root receipt has no parent
         )
+
+        print("✅ Jar created locally: \(jarID)")
+
+        // 2. Generate jar.created receipt payload
+        let payloadCBOR = try ReceiptCanonicalizer.encodeJarCreatedPayload(
+            jarName: name,
+            jarDescription: description,
+            ownerDID: ownerDID,
+            createdAtMs: Int64(Date().timeIntervalSince1970 * 1000)
+        )
+
+        // 3. Wrap in jar receipt envelope (NO sequence, NO parent_cid)
+        let receiptCBOR = try ReceiptCanonicalizer.encodeJarReceiptPayload(
+            jarID: jarID,
+            receiptType: "jar.created",
+            senderDID: ownerDID,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            parentCID: nil,  // Root receipt
+            payload: payloadCBOR
+        )
+
+        // 4. Compute CID + sign
+        let receiptCID = CanonicalCBOREncoder.computeCID(from: receiptCBOR)
+        let signature = try await IdentityManager.shared.sign(data: receiptCBOR)
+
+        print("📝 Receipt CID: \(receiptCID)")
+
+        // 5. Send to relay → relay assigns sequence (likely seq=1)
+        let response = try await RelayClient.shared.storeJarReceipt(
+            jarID: jarID,
+            receiptData: receiptCBOR,
+            signature: signature,
+            parentCID: nil
+        )
+
+        print("✅ Relay assigned sequence: \(response.sequenceNumber)")
+
+        // CRITICAL: Assert local CID matches relay CID (corruption detection)
+        guard receiptCID == response.receiptCID else {
+            print("🚨 [CORRUPTION] Local CID: \(receiptCID)")
+            print("🚨 [CORRUPTION] Relay CID: \(response.receiptCID)")
+            throw JarError.cidMismatch(local: receiptCID, relay: response.receiptCID)
+        }
+
+        // 6. Update jar with relay-assigned sequence
+        try await JarRepository.shared.updateLastSequence(jarID, response.sequenceNumber)
+        try await JarRepository.shared.updateParentCID(jarID, receiptCID)
+
+        // 7. Add owner to jar_members (active)
+        try await Database.shared.writeAsync { db in
+            try db.execute(sql: """
+                INSERT INTO jar_members (jar_id, did, role, status, added_at)
+                VALUES (?, ?, 'owner', 'active', ?)
+            """, arguments: [jarID, ownerDID, Date().timeIntervalSince1970])
+        }
+
+        print("🎉 Jar created and synced: \(name)")
 
         // Phase 10 Step 3: Structural change requires global refresh
         await refreshGlobal()
-        print("✅ Created jar: \(name)")
+
         return jar
     }
 
@@ -156,16 +220,20 @@ class JarManager: ObservableObject {
     }
 
     func addMember(jarID: String, phoneNumber: String, displayName: String) async throws {
+        print("🆕 [Module 6] Adding member: \(displayName) to jar \(jarID)")
+
         let currentMembers = try await getMembers(jarID: jarID)
         guard currentMembers.count < maxJarSize else {
             throw JarError.jarFull
         }
 
+        let ownerDID = try await IdentityManager.shared.currentDID
+
         // 1. Look up real DID from relay
-        let did = try await RelayClient.shared.lookupDID(phoneNumber: phoneNumber)
+        let memberDID = try await RelayClient.shared.lookupDID(phoneNumber: phoneNumber)
 
         // 2. Get ALL devices for this DID (not just first one)
-        let devices = try await DeviceManager.shared.getDevices(for: [did])
+        let devices = try await DeviceManager.shared.getDevices(for: [memberDID])
         guard !devices.isEmpty else {
             throw JarError.userNotRegistered
         }
@@ -181,27 +249,161 @@ class JarManager: ObservableObject {
 
                 if !exists {
                     try device.insert(db)
-                    print("🔐 Pinned device \(device.deviceId) for \(did)")
+                    print("🔐 Pinned device \(device.deviceId) for \(memberDID)")
                 }
             }
         }
 
-        // 4. Add member to jar (use first device's X25519 key for jar_members table)
-        let firstDevice = devices[0]
-        try await JarRepository.shared.addMember(
+        // 4. Convert Device objects to DeviceInfo for receipt payload
+        let deviceInfos = devices.map { device in
+            DeviceInfo(
+                deviceId: device.deviceId,
+                pubkeyEd25519: device.pubkeyEd25519,
+                pubkeyX25519: device.pubkeyX25519
+            )
+        }
+
+        // 5. Generate jar.member_added receipt payload
+        let payload = JarMemberAddedPayload(
+            memberDID: memberDID,
+            memberDisplayName: displayName,
+            memberPhoneNumber: phoneNumber,
+            memberDevices: deviceInfos,
+            addedByDID: ownerDID,
+            addedAtMs: Int64(Date().timeIntervalSince1970 * 1000)
+        )
+        let payloadCBOR = try ReceiptCanonicalizer.encodeJarMemberAddedPayload(payload)
+
+        // 6. Get jar's current parent CID for causal chain
+        let jar = try await JarRepository.shared.getJar(id: jarID)
+        guard let jar = jar else {
+            throw JarError.jarNotFound
+        }
+
+        // 7. Wrap in jar receipt envelope (NO sequence)
+        let receiptCBOR = try ReceiptCanonicalizer.encodeJarReceiptPayload(
             jarID: jarID,
-            memberDID: did,
-            displayName: displayName,
-            phoneNumber: phoneNumber,
-            pubkeyX25519: firstDevice.pubkeyX25519
+            receiptType: "jar.member_added",
+            senderDID: ownerDID,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            parentCID: jar.parentCID,
+            payload: payloadCBOR
         )
 
-        print("✅ Added jar member: \(displayName) to jar \(jarID) with \(devices.count) devices pinned")
+        // 8. Compute CID + sign
+        let receiptCID = CanonicalCBOREncoder.computeCID(from: receiptCBOR)
+        let signature = try await IdentityManager.shared.sign(data: receiptCBOR)
+
+        print("📝 Receipt CID: \(receiptCID)")
+
+        // 9. Send to relay → relay assigns sequence + broadcasts
+        let response = try await RelayClient.shared.storeJarReceipt(
+            jarID: jarID,
+            receiptData: receiptCBOR,
+            signature: signature,
+            parentCID: jar.parentCID
+        )
+
+        print("✅ Relay assigned sequence: \(response.sequenceNumber)")
+
+        // CRITICAL: Assert local CID matches relay CID (corruption detection)
+        guard receiptCID == response.receiptCID else {
+            print("🚨 [CORRUPTION] Local CID: \(receiptCID)")
+            print("🚨 [CORRUPTION] Relay CID: \(response.receiptCID)")
+            throw JarError.cidMismatch(local: receiptCID, relay: response.receiptCID)
+        }
+
+        // 10. Update jar with relay-assigned sequence
+        try await JarRepository.shared.updateLastSequence(jarID, response.sequenceNumber)
+        try await JarRepository.shared.updateParentCID(jarID, receiptCID)
+
+        print("🎉 Member added and synced: \(displayName) (\(devices.count) devices)")
+
+        // Phase 10 Step 3: Structural change requires global refresh
+        await refreshGlobal()
     }
 
     func removeMember(jarID: String, memberDID: String) async throws {
         try await JarRepository.shared.removeMember(jarID: jarID, memberDID: memberDID)
         print("✅ Removed jar member: \(memberDID) from jar \(jarID)")
+    }
+
+    // MARK: - Invite Flow (Module 6)
+
+    /// Accept an invite to join a jar
+    /// Generates jar.invite_accepted receipt → relay broadcasts to all jar members
+    func acceptInvite(jarID: String) async throws {
+        print("✅ [Module 6] Accepting invite for jar: \(jarID)")
+
+        let myDID = try await IdentityManager.shared.currentDID
+
+        // 1. Verify invite exists and is pending
+        let member = try await Database.shared.readAsync { db in
+            try JarMember
+                .filter(JarMember.Columns.jarID == jarID)
+                .filter(JarMember.Columns.memberDID == myDID)
+                .filter(JarMember.Columns.status == "pending")
+                .fetchOne(db)
+        }
+
+        guard member != nil else {
+            throw JarError.inviteNotFound
+        }
+
+        // 2. Generate jar.invite_accepted receipt payload
+        let payload = JarInviteAcceptedPayload(
+            memberDID: myDID,
+            acceptedAtMs: Int64(Date().timeIntervalSince1970 * 1000)
+        )
+        let payloadCBOR = try ReceiptCanonicalizer.encodeJarInviteAcceptedPayload(payload)
+
+        // 3. Get jar's current parent CID for causal chain
+        let jar = try await JarRepository.shared.getJar(id: jarID)
+        guard let jar = jar else {
+            throw JarError.jarNotFound
+        }
+
+        // 4. Wrap in jar receipt envelope (NO sequence)
+        let receiptCBOR = try ReceiptCanonicalizer.encodeJarReceiptPayload(
+            jarID: jarID,
+            receiptType: "jar.invite_accepted",
+            senderDID: myDID,
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
+            parentCID: jar.parentCID,
+            payload: payloadCBOR
+        )
+
+        // 5. Compute CID + sign
+        let receiptCID = CanonicalCBOREncoder.computeCID(from: receiptCBOR)
+        let signature = try await IdentityManager.shared.sign(data: receiptCBOR)
+
+        print("📝 Receipt CID: \(receiptCID)")
+
+        // 6. Send to relay → relay assigns sequence + broadcasts
+        let response = try await RelayClient.shared.storeJarReceipt(
+            jarID: jarID,
+            receiptData: receiptCBOR,
+            signature: signature,
+            parentCID: jar.parentCID
+        )
+
+        print("✅ Relay assigned sequence: \(response.sequenceNumber)")
+
+        // CRITICAL: Assert local CID matches relay CID (corruption detection)
+        guard receiptCID == response.receiptCID else {
+            print("🚨 [CORRUPTION] Local CID: \(receiptCID)")
+            print("🚨 [CORRUPTION] Relay CID: \(response.receiptCID)")
+            throw JarError.cidMismatch(local: receiptCID, relay: response.receiptCID)
+        }
+
+        // 7. Update jar with relay-assigned sequence
+        try await JarRepository.shared.updateLastSequence(jarID, response.sequenceNumber)
+        try await JarRepository.shared.updateParentCID(jarID, receiptCID)
+
+        print("🎉 Invite accepted for jar: \(jarID)")
+
+        // Phase 10 Step 3: Structural change requires global refresh
+        await refreshGlobal()
     }
 
     // MARK: - TOFU Key Pinning (Phase 7)
@@ -326,6 +528,8 @@ enum JarError: Error, LocalizedError {
     case jarNotFound
     case cannotDeleteSoloJar
     case soloJarNotFound
+    case inviteNotFound                             // Module 6: Invite acceptance
+    case cidMismatch(local: String, relay: String)  // Module 5b: Corruption detection
 
     var errorDescription: String? {
         switch self {
@@ -347,6 +551,10 @@ enum JarError: Error, LocalizedError {
             return "Cannot delete Solo jar (system jar)"
         case .soloJarNotFound:
             return "Solo jar not found. Please reinstall the app."
+        case .inviteNotFound:
+            return "No pending invite found for this jar"
+        case .cidMismatch(let local, let relay):
+            return "CID mismatch: local=\(local), relay=\(relay)"
         }
     }
 }

@@ -15,6 +15,8 @@ struct Jar: Identifiable, Codable, FetchableRecord, PersistableRecord {
     var ownerDID: String
     var createdAt: Date
     var updatedAt: Date
+    var lastSequenceNumber: Int?  // Phase 10.3: Last processed jar receipt sequence
+    var parentCID: String?         // Phase 10.3: Last receipt CID (causal parent)
 
     // MARK: - Database
 
@@ -27,6 +29,8 @@ struct Jar: Identifiable, Codable, FetchableRecord, PersistableRecord {
         static let ownerDID = Column("owner_did")
         static let createdAt = Column("created_at")
         static let updatedAt = Column("updated_at")
+        static let lastSequenceNumber = Column("last_sequence_number")
+        static let parentCID = Column("parent_cid")
     }
 
     // MARK: - Coding Keys
@@ -38,6 +42,8 @@ struct Jar: Identifiable, Codable, FetchableRecord, PersistableRecord {
         case ownerDID = "owner_did"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case lastSequenceNumber = "last_sequence_number"
+        case parentCID = "parent_cid"
     }
 }
 

@@ -49,14 +49,27 @@ struct JarCreatedPayload: Codable {
 }
 
 /**
+ * Device info for TOFU key pinning
+ *
+ * Included in jar.member_added receipts so all jar members can pin invitee's devices
+ */
+struct DeviceInfo: Codable {
+    let deviceId: String
+    let pubkeyEd25519: String       // For signature verification
+    let pubkeyX25519: String        // For E2EE encryption
+}
+
+/**
  * jar.member_added - Owner adds member to jar
  *
  * Sets member status to "pending" (awaiting invite_accepted)
+ * Module 6: Includes device list for TOFU key pinning across all jar members
  */
 struct JarMemberAddedPayload: Codable {
     let memberDID: String
     let memberDisplayName: String
     let memberPhoneNumber: String   // For UI
+    let memberDevices: [DeviceInfo] // TOFU: All jar members pin these devices
     let addedByDID: String          // Owner (redundant but explicit)
     let addedAtMs: Int64
 }
