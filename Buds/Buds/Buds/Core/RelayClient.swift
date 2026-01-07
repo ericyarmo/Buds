@@ -11,8 +11,7 @@ import CryptoKit
 
 class RelayClient {
     static let shared = RelayClient()
-    // Phase 10.3 Module 0.3: Production relay with deterministic phone encryption
-    let baseURL = "https://buds-relay.getstreams.workers.dev"  // Changed to internal for extensions
+    let baseURL = "https://buds-relay.getstreams.workers.dev"  // Production relay
 
     private init() {}
 
@@ -310,6 +309,38 @@ class RelayClient {
         }
 
         print("✅ Message \(messageId) deleted from relay")
+    }
+
+    // MARK: - Jar Discovery (Phase 10.3 Module 6.5)
+
+    /// List all jars where the user is an active member
+    /// Enables discovering jars the user has been added to
+    func listUserJars() async throws -> [(jarId: String, role: String)] {
+        let headers = try await authHeader()
+        let url = URL(string: "\(baseURL)/api/jars/list")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        headers.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+
+        let (data, res) = try await URLSession.shared.data(for: req)
+        let statusCode = (res as? HTTPURLResponse)?.statusCode ?? 0
+
+        guard statusCode == 200 else {
+            throw RelayError.serverError
+        }
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let jarsArray = json?["jars"] as? [[String: Any]] else {
+            throw RelayError.invalidResponse
+        }
+
+        return try jarsArray.map { dict in
+            guard let jarId = dict["jar_id"] as? String,
+                  let role = dict["role"] as? String else {
+                throw RelayError.invalidResponse
+            }
+            return (jarId: jarId, role: role)
+        }
     }
 }
 

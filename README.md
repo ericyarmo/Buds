@@ -8,15 +8,15 @@ Built on receipt-first, local-first, privacy-by-default principles.
 
 ## Project Status
 
-**Current Build:** ✅ Phase 10.3 Module 6 Complete | Member Invite Flow ✅
-**Date:** January 5, 2026
+**Current Build:** ✅ Phase 10.3 Module 6.5 Complete | Jar Discovery + Multi-Device Testing ✅
+**Date:** January 6, 2026
 **Version:** 1.0.0 (Beta)
 **Bundle ID:** `app.getbuds.buds`
 
-**Latest Milestone:** Phase 10.3 Module 6 Complete - Member Invite Flow ✅
-**Status:** Jar sync loop + member invites complete, bud sharing next
-**Next Up:** Module 7 (Bud Sharing with jar_id) → TestFlight Multi-Device Testing
-**Goal:** Complete distributed jar sync → TestFlight beta (20-50 users)
+**Latest Milestone:** Multi-Device Jar Sync Working in TestFlight ✅
+**Status:** Jar infrastructure complete (Modules 0.1-6.5), bud sharing next
+**Next Up:** Module 7 (E2EE Bud Sharing with jar_id) → Full E2EE Multi-Device Testing
+**Goal:** Complete E2EE jar sharing → TestFlight beta expansion (20-50 users)
 
 ---
 
@@ -154,6 +154,15 @@ Built on receipt-first, local-first, privacy-by-default principles.
 - JarManager.acceptInvite() generates jar.invite_accepted receipt
 - Fixed applyMemberAdded() SQL schema mismatch (pubkey_x25519, created_at, etc.)
 - Device broadcast prevents E2EE breakage across jar members
+
+**Module 6.5: Jar Discovery + Multi-Device Testing (3-4h) ✅**
+- Added `/api/jars/list` relay endpoint for jar discovery
+- InboxManager.discoverNewJars() - auto-discovers jars on every poll
+- Relay bug fixes: DID namespace confusion, receipt processor, BigInt handling, nested CBOR
+- Keychain background access fix (errSecInteractionNotAllowed)
+- Fixed JarSyncManager SQL constraints (updated_at, member_did schema)
+- ✅ **TESTED IN PRODUCTION**: Multi-device jar sync working in TestFlight
+- Both users can see shared jars + members automatically
 
 ### 🔜 Next Modules (Week 2)
 
@@ -419,7 +428,7 @@ All planning docs organized in `docs/` folder:
 
 **Current Focus:** Phase 10.3 - Crypto + Distributed Systems Hardening (~24-33 hours remaining)
 
-**Completed (Modules 0.1-6):**
+**Completed (Modules 0.1-6.5):**
 - ✅ Module 0.1: CBOR pinning
 - ✅ Module 0.2: Phone-based identity
 - ✅ Module 0.3: Deterministic phone encryption
@@ -433,6 +442,7 @@ All planning docs organized in `docs/` folder:
 - ✅ Module 5a: Jar sync loop (30s polling, 2-layer dedupe, corruption detection)
 - ✅ Module 5b: Jar creation with sync (receipt generation, CID validation)
 - ✅ Module 6: Member invite flow (device broadcast, TOFU pinning, invite acceptance)
+- ✅ Module 6.5: Jar discovery + multi-device testing (relay bug fixes, TestFlight verified)
 
 **In Progress (Modules 7-10):**
 - 🔄 Module 7: Bud sharing with jar_id (2-3h) ← **CURRENT**
@@ -462,13 +472,13 @@ Private project. Architecture by Claude (Anthropic) + Eric.
 
 ## Build Progress Tracker
 
-**Last Updated:** January 5, 2026
-**Current Phase:** Phase 10.3 Module 6 Complete ✅
-**Latest Commit:** Phase 10.3 Module 6 - Member Invite Flow
+**Last Updated:** January 6, 2026
+**Current Phase:** Phase 10.3 Module 6.5 Complete ✅
+**Latest Commit:** Module 6.5 - Jar Discovery + Multi-Device Testing (TestFlight Verified)
 
-**Status:** Jar sync complete! (Modules 0.1-6 done, 4 modules remaining)
-**Next Session:** Module 7 (Bud Sharing with jar_id) + Multi-Device TestFlight Testing
-**Estimated Time to Beta:** 10-14 hours remaining
+**Status:** Jar infrastructure COMPLETE! (Modules 0.1-6.5 done, 3.5 modules remaining)
+**Next Session:** Module 7 (E2EE Bud Sharing with jar_id) - Complete the full E2EE flow
+**Estimated Time to Beta:** 8-11 hours remaining
 
 ---
 

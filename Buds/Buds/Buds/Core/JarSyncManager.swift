@@ -360,29 +360,38 @@ class JarSyncManager {
         // Create jar locally
         try await db.writeAsync { db in
             try db.execute(sql: """
-                INSERT INTO jars (id, name, description, owner_did, created_at, last_sequence_number, parent_cid)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO jars (id, name, description, owner_did, created_at, updated_at, last_sequence_number, parent_cid)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, arguments: [
                 envelope.jarID,
                 payload.jarName,
                 payload.jarDescription,
                 payload.ownerDID,
                 payload.createdAtMs / 1000,  // Convert ms to seconds
+                payload.createdAtMs / 1000,  // updated_at = created_at initially
                 envelope.sequenceNumber,
                 envelope.receiptCID
             ])
         }
 
         // Add owner to jar_members (role: owner, status: active)
+        // Note: Owner device details will be added when jar.member_added is processed
         try await db.writeAsync { db in
             try db.execute(sql: """
-                INSERT OR IGNORE INTO jar_members (jar_id, did, role, status, added_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO jar_members (
+                    jar_id, member_did, display_name, pubkey_x25519, role, status,
+                    joined_at, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, arguments: [
                 envelope.jarID,
                 payload.ownerDID,
+                "Owner",  // Placeholder display name
+                "",  // Placeholder pubkey (will be updated by jar.member_added)
                 "owner",
                 "active",
+                payload.createdAtMs / 1000,
+                Date().timeIntervalSince1970,
                 Date().timeIntervalSince1970
             ])
         }

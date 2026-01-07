@@ -1,7 +1,7 @@
 # Jar Architecture (High-Level)
 
-**Last Updated:** January 3, 2026
-**Phase:** 10.3 - Jar Sync & Multiplayer
+**Last Updated:** January 6, 2026
+**Phase:** 10.3 - Jar Sync & Multiplayer (Modules 0.1-6.5 Complete)
 
 ---
 
@@ -538,6 +538,65 @@ A: Future work (Phase 12): Key recovery via social recovery or seed phrases. For
 
 ---
 
+## Jar Discovery (Module 6.5)
+
+**Problem:** Users need to discover jars they've been added to.
+
+**Solution:** Automatic discovery via `/api/jars/list` endpoint.
+
+### Discovery Flow:
+
+```
+Every 30s (during inbox poll):
+
+1. Call GET /api/jars/list
+   → Relay queries jar_members WHERE member_did = user_did
+   → Returns [{jar_id, role}, ...]
+
+2. Compare with local jars
+   → newJars = remoteJars - localJars
+
+3. For each NEW jar:
+   ├─ Fetch receipts from sequence 0: GET /api/jars/:id/receipts?after=0
+   ├─ Apply receipts sequentially (jar.created → jar.member_added → ...)
+   ├─ Jar + members created locally
+   └─ Normal polling takes over
+
+4. For existing jars:
+   └─ Fetch incremental updates: GET /api/jars/:id/receipts?after=lastSeq
+```
+
+### Security:
+
+**DID Namespace Separation (Critical):**
+```typescript
+// WRONG: Using Firebase UID
+const userDid = user.uid;  // "FLrpCAH1RxV1EOqJuOmZZ3HgVvQ2"
+
+// CORRECT: Extract DID from signed receipt
+const userDid = extractSenderDid(receiptBytes);  // "did:phone:347fd6a9..."
+```
+
+**Why This Matters:**
+- Firebase UID = authentication layer (HTTP)
+- DID = cryptographic identity layer (E2EE)
+- Using UID for crypto operations = namespace violation
+- Relay uses DID for device lookups, membership checks, signature verification
+
+### Performance:
+
+**Discovery Cost:** ~65ms per poll (only queries jar_members table)
+**Backfill Cost:** ~100ms per new jar (fetch receipts from seq 0)
+**Steady State:** ~30ms per jar (incremental updates only)
+
+**Optimizations:**
+- Discovery runs first (before polling)
+- Only fetches receipts for NEW jars
+- Incremental polling for existing jars
+- Deduplication: skip if remoteJars == localJars
+
+---
+
 ## Architecture Status
 
 **Completed:**
@@ -548,10 +607,12 @@ A: Future work (Phase 12): Key recovery via social recovery or seed phrases. For
 - ✅ TOFU key pinning
 - ✅ Dynamic device discovery
 - ✅ Safety number verification UI
+- ✅ Jar discovery endpoint (/api/jars/list)
+- ✅ Automatic jar sync (30s polling + discovery)
+- ✅ Multi-device testing (TestFlight verified)
 
 **In Progress:**
-- 🔄 iOS client updates (use relay envelope)
-- 🔄 Receipt types implementation (jar.created, jar.member_added, etc.)
+- 🔄 E2EE bud sharing with jar_id (Module 7)
 
 **Future:**
 - ⚪ Push notifications (FCM)

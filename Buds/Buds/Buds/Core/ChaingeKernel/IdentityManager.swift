@@ -162,7 +162,8 @@ actor IdentityManager {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
             kSecAttrAccount as String: key,
-            kSecValueData as String: data
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock  // Allow background access
         ]
 
         // Delete existing item first
@@ -208,7 +209,7 @@ actor IdentityManager {
     // MARK: - Reset (for testing)
 
     func resetIdentity() throws {
-        let keys = ["ed25519_private", "x25519_private", "device_id"]
+        let keys = ["ed25519_private", "x25519_private", "device_id", "account_salt"]
         for key in keys {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,

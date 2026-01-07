@@ -1,8 +1,9 @@
 # Buds End-to-End Encryption Design
 
-**Last Updated:** December 30, 2025
-**Version:** v0.1 (Phase 10.1 - Multi-User Reactions)
-**Security Level:** Private Circle & Jar Sharing (12 max)
+**Last Updated:** January 6, 2026
+**Version:** v0.2 (Phase 10.3 Modules 0.1-6.5 - Jar Infrastructure Complete)
+**Security Level:** Private Jar Sharing (12 max)
+**Status:** Multi-device jar sync working in production ✅
 
 ---
 
@@ -706,6 +707,46 @@ Receipts are truth (CID + Ed25519 signature over canonical CBOR bytes). E2EE is 
 - Relay timestamps are metadata only, NOT used for receipt ordering (causality = `parentCID` chains)
 - Device keys are stable (v0.1), NOT per-message ephemeral X25519 keypairs
 - DIDs are pseudonymous, NOT anonymous (relay sees social graph metadata)
+
+---
+
+## Deployment Status (Phase 10.3 Modules 0.1-6.5)
+
+### ✅ Working in Production (TestFlight Verified)
+
+**Jar Infrastructure:**
+- Multi-device jar sync (30s polling + automatic discovery)
+- Jar creation with relay-assigned sequences
+- Member management (add, remove, TOFU device pinning)
+- Gap detection & queueing (handles out-of-order receipts)
+- Background inbox polling (keychain access fixed)
+
+**Crypto & Security:**
+- Phone-based DID (same DID across devices)
+- Deterministic phone encryption (AES-256-GCM)
+- CBOR library pinned (SwiftCBOR 0.4.5 - prevents signature breaks)
+- CID verification (relay matches iOS exactly)
+- 4-layer security (CID + signature + auth + membership)
+- DID namespace separation (Firebase UID for auth, DID for crypto)
+
+**Relay Fixes:**
+- Fixed DID extraction from receipt CBOR
+- Fixed receipt processor (was stub, now fully implemented)
+- Fixed BigInt → Number conversion for D1 database
+- Fixed nested CBOR payload decoding
+- Fixed jar_members SQL schema mismatches
+
+### 🔜 Next: Module 7 (E2EE Bud Sharing)
+
+**What's Left:**
+- Add `jar_id` to bud receipt schema
+- Validate jar membership before sharing buds
+- Route incoming buds to correct jar
+- UI: Share bud to specific jar (picker)
+
+**Expected:** 2-3 hours → Complete E2EE jar sharing end-to-end!
+
+**After Module 7:** E2EE will be fully functional for multi-device jar sharing.
 
 ---
 

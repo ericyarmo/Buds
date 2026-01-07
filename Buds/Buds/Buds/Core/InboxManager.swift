@@ -90,6 +90,9 @@ actor InboxManager {
     /// Poll jar receipts for all active jars
     private func pollJarReceipts() async {
         do {
+            // Phase 10.3 Module 6.5: Discover new jars before polling
+            await discoverNewJars()
+
             // Get sync targets from JarSyncManager (clean interface)
             let targets = try await JarSyncManager.shared.getSyncTargets()
 
@@ -113,6 +116,69 @@ actor InboxManager {
 
         } catch {
             print("❌ [JAR_SYNC] Failed to get sync targets: \(error)")
+        }
+    }
+
+    /// Discover new jars the user has been added to (Phase 10.3 Module 6.5)
+    private func discoverNewJars() async {
+        do {
+            // Call /api/jars/list to get all jars where user is a member
+            let remoteJars = try await RelayClient.shared.listUserJars()
+
+            guard !remoteJars.isEmpty else {
+                return
+            }
+
+            print("🔍 Discovered \(remoteJars.count) jars from relay")
+
+            // Get local jars
+            let localJars = try await JarRepository.shared.getAllJars()
+            let localJarIds = Set(localJars.map { $0.id })
+
+            // Find new jars (not in local database)
+            let newJars = remoteJars.filter { !localJarIds.contains($0.jarId) }
+
+            guard !newJars.isEmpty else {
+                print("✅ All jars already synced locally")
+                return
+            }
+
+            print("🆕 Found \(newJars.count) new jars to sync")
+
+            // For each new jar, create local record and fetch receipts from sequence 0
+            for remoteJar in newJars {
+                do {
+                    let jarPrefix = String(remoteJar.jarId.prefix(8))
+                    print("📥 Syncing new jar \(jarPrefix)... (role: \(remoteJar.role))")
+
+                    // Fetch all receipts from sequence 0
+                    let envelopes = try await RelayClient.shared.getJarReceipts(
+                        jarID: remoteJar.jarId,
+                        after: 0,
+                        limit: 100
+                    )
+
+                    guard !envelopes.isEmpty else {
+                        print("⚠️  Jar \(jarPrefix) has no receipts yet")
+                        continue
+                    }
+
+                    // Apply receipts to create jar locally (skipGapDetection = true for initial sync)
+                    for envelope in envelopes {
+                        try await JarSyncManager.shared.processEnvelope(envelope, skipGapDetection: true)
+                    }
+
+                    print("✅ Synced jar \(jarPrefix) with \(envelopes.count) receipts")
+
+                } catch {
+                    print("❌ Failed to sync new jar \(remoteJar.jarId): \(error)")
+                    // Continue with other jars
+                }
+            }
+
+        } catch {
+            print("❌ Jar discovery failed: \(error)")
+            // Non-fatal - continue with normal polling
         }
     }
 
